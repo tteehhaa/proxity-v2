@@ -8,8 +8,8 @@ st.set_page_config(page_title="아파트 단지 추천 프로그램 (2025년 5�
 
 # 앱 제목 및 설명
 st.markdown("""
-# 잠원동 아파트 단지 추천프로그램
-**2025년 5월 v0.1**
+# 잠원동 아파트 단지 추천기  
+**2025년 5월 버전 v0.1**
 
 입력하신 조건에 따라 예산, 평형, 건물 컨디션, 선호 노선 등을 종합해  
 지금 고려해볼 만한 잠원동 단지를 제안드립니다.
@@ -31,7 +31,6 @@ with st.form("user_input_form"):
     # 예산 계산
     total_budget = cash + loan
     budget_upper = total_budget * 1.1  # +10% 추가 예산
-    budget_cap = total_budget * 1.3   # 확장 예산
 
     submitted = st.form_submit_button("지금 추천 받기")
 
@@ -167,12 +166,11 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
     condition_text = "입력하신 조건(" + ", ".join(notes) + ")에 따라 추천된 단지입니다." if notes else "입력하신 조건을 기반으로 추천된 단지입니다."
     return condition_text, condition_mismatch
 
-def classify_recommendation(row, budget_upper, budget_cap):
+def classify_recommendation(row, budget_upper):
     """추천 이유 분류"""
-    if row['실사용가격'] > budget_upper and row['실사용가격'] <= budget_cap:
-        return "예산 상한을 약간 초과하나, 조건에 부합해 추가 추천된 단지입니다."
-    elif row['실사용가격'] > budget_upper:
-        return "실거래가는 예산 내에 있지만 현재 호가가 높아 구매가 어려울 수 있습니다."
+    if row['실사용가격'] > budget_upper:
+        additional_budget = round(row['실사용가격'] - budget_upper, 2)
+        return f"입력하신 예산을 약간 초과합니다. 약 {additional_budget}억의 추가 예산이 필요합니다."
     elif row['점수'] >= 4 and row['실사용가격'] <= budget_upper:
         return "예산과 조건을 모두 충족한 단지입니다."
     else:
@@ -229,52 +227,39 @@ if submitted:
     df.loc[mask_추정, '실사용가격'] = df['추정가']
     df.loc[mask_추정, '가격출처_실사용'] = '추정'
 
-    # 현재 호가/추정가 상한 설정
-    df['호가_상한'] = df['현재호가'] * 1.1
-    df['추정가_상한'] = df['추정가'] * 1.1
-
-    # 필터링: 예산 상한 및 확장 예산 모두 고려
-    df_budget_filtered = df[
-        (df['호가_상한'].notna() & (df['호가_상한'] <= budget_cap)) | 
-        (df['호가_상한'].isna() & df['추정가_상한'].notna() & (df['추정가_상한'] <= budget_cap))
-    ].copy()
-
     # 오래된 거래 제외
-    df_budget_filtered = df_budget_filtered[(df_budget_filtered['거래연도'].isna()) | (df_budget_filtered['거래연도'] >= 2024)]
+    df = df[(df['거래연도'].isna()) | (df['거래연도'] >= 2024)]
 
     # 예산 내 단지 필터링 (budget_upper 이내)
-    df_filtered = df_budget_filtered[df_budget_filtered['실사용가격'] <= budget_upper].copy()
+    df_filtered = df[df['실사용가격'] <= budget_upper].copy()
     df_filtered = df_filtered.sort_values(by=["점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"], ascending=[False, False, False, False, False])
     df_filtered = df_filtered.drop_duplicates(subset=['단지명'], keep='first')
     top3 = df_filtered.head(3)
 
-    # 단지 2개일 경우 예산 확장
+    # 단지 2개일 경우 예산 초과 단지 중 최저 예산 단지 추가
     if len(top3) == 2:
-        df_extended = df_budget_filtered[df_budget_filtered['실사용가격'] <= budget_cap].copy()
-        df_extended = df_extended.sort_values(by=["점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"], ascending=[False, False, False, False, False])
+        df_extended = df[df['실사용가격'] > budget_upper].copy()
+        df_extended = df_extended.sort_values(by=["실사용가격", "점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"], ascending=[True, False, False, False, False, False])
         df_extended = df_extended.drop_duplicates(subset=['단지명'], keep='first')
-        top3 = df_extended.head(3)
-        if len(top3) < 3:
-            st.markdown(f"""
-            **안내**: 현재 잠원동 아파트의 호가가 높아 예산 상한(%.2f억원)을 초과한 단지를 포함해도 3개 단지를 찾지 못했습니다.  
-            현재 데이터에서 %.2f억원 이하 단지가 부족합니다. 데이터를 확인하거나 예산을 추가로 확장(예: %.2f억원)해 보세요.
-            """ % (budget_upper, budget_cap, budget_cap * 1.2))
+        if not df_extended.empty:
+            top3 = pd.concat([top3, df_extended.head(1)], ignore_index=True)
 
     # 추천 단지 부족 시 메시지
     if len(top3) == 0:
         st.markdown("""
-        **안내**: 현재 잠원동 아파트의 호가가 예산 상한(%.2f억원)을 초과해 추천 가능한 단지가 없습니다.  
+        **안내**: 현재 잠원동 아파트의 호가가 입력하신 예산보다 높게 형성되어 추천 가능한 단지가 없습니다.  
         2025년 5월 기준, 잠원동 아파트 시장은 호가가 실거래가보다 높게 형성되어 있습니다.  
-        - **대안 1**: 예산을 상향 조정해 보세요.  
-        - **대안 2**: 시장이 안정화될 때까지(예: 2025년 하반기) 기다려보는 것도 방법입니다.  
+        - 예산을 상향 조정해 보세요.  
+        - 시장이 안정화될 때까지 기다려보는 것도 방법입니다.  
         추가 조건 조정이나 상담이 필요하시면 말씀해주세요!
-        """ % budget_upper)
+        """)
         st.stop()
     elif len(top3) < 3 and len(top3) > 0:
         st.markdown("""
-        **안내**: 현재 잠원동 아파트의 호가가 높아 예산 상한(%.2f억원)에 맞는 단지가 제한적입니다.  
-        아래는 조건에 부합하는 몇 가지 단지입니다. 추가 조건 조정이나 대안을 원하시면 말씀해주세요!
-        """ % budget_upper)
+        **안내**: 현재 잠원동 아파트의 호가가 입력하신 예산보다 높게 형성되어 추천 단지가 제한적입니다.  
+        아래 단지 중 일부는 예산을 약간 초과하나, 조건에 부합해 추가로 추천드립니다.  
+        추가 조건 조정이나 대안을 원하시면 말씀해주세요!
+        """)
 
     # 조건 불일치 확인
     condition_mismatch = False
@@ -304,7 +289,7 @@ if submitted:
         호가전용면적 = round(row['호가전용면적'], 1) if pd.notna(row['호가전용면적']) else 면적
         출처 = row['가격출처']
         조건설명, _ = get_condition_note(cash, loan, area_group, condition, lines, household, row)
-        추천이유 = classify_recommendation(row, budget_upper, budget_cap)
+        추천이유 = classify_recommendation(row, budget_upper)
 
         # 가격 출력
         실거래출력 = f"{실거래} (거래일: {거래일})"
@@ -317,7 +302,8 @@ if submitted:
 
         # 텍스트 형식으로 출력
         st.markdown(f"""
-**단지명**: {단지명}  
+#### **{단지명}**
+
 **기본 정보**:  
 - 평형: {평형}평  
 - 전용면적: {면적}㎡  
@@ -330,13 +316,13 @@ if submitted:
 
 **추천 이유**:  
 {조건설명} {추천이유}  
+
+---
         """)
 
-    st.markdown("---")
     st.markdown("""
     ※ 위 추천은 사용자의 입력 조건과 2025.05 기준가를 종합하여 제안드린 결과입니다.  
-    ※ 본 추천 결과는 동생의 내집마련을 위한 정보를 제공 목적으로 이루어지는 테스트이며, 투자 권유 또는 자문이 아닙니다.  
+    ※ 본 추천은 동생의 내집마련을 위한 정보를 제공 목적으로 이루어지는 테스트이며, 투자 권유 또는 자문이 아닙니다.  
     ※ 실제 매수 결정 시에는 본인의 판단과 책임 하에 신중히 검토해주시기 바랍니다.
     ※ 잠원동생집사 v0.1 - 20250521
-    
     """)
