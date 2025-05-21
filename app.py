@@ -89,17 +89,42 @@ def score_complex(row, cash, loan, area_group, condition, lines, household):
         score += 1
     return score
 
+def score_correlated_factors(row, area_group, condition, lines, household):
+    """상관 요소(노선, 규모, 컨디션, 평형대)에 따른 추가 점수"""
+    score = 0
+    pyeong = row["평형"]
+    p_min, p_max = get_area_range(area_group)
+    if area_group != "상관없음" and p_min <= pyeong <= p_max:
+        score += 0.5
+    building_type = str(row.get("건축유형", "")).strip()
+    if condition != "상관없음":
+        if condition == "신축" and (row['준공연도'] >= 2018 or building_type == "신축"):
+            score += 0.5
+        elif condition == building_type:
+            score += 0.5
+    if "상관없음" not in lines:
+        if row['역세권'] == "Y" and any(line in str(row.get("노선", "")) for line in lines):
+            score += 0.5
+    if household != "상관없음":
+        if household == "대단지" and row['세대수'] >= 1000:
+            score += 0.5
+        elif household == "소단지" and row['세대수'] < 1000:
+            score += 0.5
+    return score
+
 def round_price(val, price_type, is_estimated=False):
-    """가격을 억 단위로 반올림, 호가/추정가는 +10% 범위 포함"""
+    """가격을 억 단위로 반올림, 실거래가는 범위 없이 정확한 금액, 호가/추정가는 +10% 범위 포함"""
     if pd.isna(val) or val < 1.0:
         return "정보 없음"
+    if price_type == "실거래가":
+        return f"{round(val, 2):.2f}억"  # 실거래가는 범위 없이 정확한 금액
     if price_type in ["호가", "동일단지 유사평형 호가 추정"] or is_estimated:
         upper = round(val * 1.1, 2)  # +10% 범위
         return f"{round(val, 2):.2f}~{upper:.2f}억"
     return f"{round(val, 2):.2f}억"
 
 def get_condition_note(cash, loan, area_group, condition, lines, household, row):
-    """사용자 조건과 단지 데이터 간 일치성 설명"""
+    """사용자 조건 설명"""
     notes = []
     condition_mismatch = False
     if cash > 0:
@@ -133,12 +158,13 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
             notes.append("소단지")
         else:
             condition_mismatch = True
-    return "입력하신 조건(" + ", ".join(notes) + ")에 따라 우선순위를 적용해 추천했습니다." if notes else "입력하신 조건을 기반으로 추천했습니다.", condition_mismatch
+    condition_text = "입력하신 조건(" + ", ".join(notes) + ")에 따라 추천된 단지입니다." if notes else "입력하신 조건을 기반으로 추천된 단지입니다."
+    return condition_text, condition_mismatch
 
 def classify_recommendation(row, budget_upper):
-    """추천 단지 분류"""
+    """추천 이유 분류"""
     if row['실사용가격'] > budget_upper:
-        return "예산 초과 단지 포함: 조건을 충족해 추가로 추천되었습니다."
+        return "예산 초과 단지로, 조건을 충족해 추가로 추천되었습니다."
     elif row['점수'] >= 4 and row['실사용가격'] <= budget_upper:
         return "예산과 조건을 모두 충족한 단지입니다."
     else:
@@ -176,6 +202,18 @@ if submitted:
     # 점수 계산
     df["점수"] = df.apply(lambda row: score_complex(row, cash, loan, area_group, condition, lines, household), axis=1)
 
+    # 상관 요소 점수 계산
+    df["상관_점수"] = df.apply(lambda row: score_correlated_factors(row, area_group, condition, lines, household), axis=1)
+
+    # 세대수와 준공연도 통합 점수 계산
+    min_households = df['세대수'].min()
+    max_households = df['세대수'].max()
+    min_year = df['준공연도'].min()
+    max_year = df['준공연도'].max()
+    df['세대수_점수'] = (df['세대수'] - min_households) / (max_households - min_households) if max_households != min_households else 0
+    df['준공연도_점수'] = (df['준공연도'] - min_year) / (max_year - min_year) if max_year != min_year else 0
+    df['통합_점수'] = 0.6 * df['세대수_점수'] + 0.4 * df['준공연도_점수']
+
     # 역세권 및 노선 우선순위
     df['역세권_우선'] = df['역세권'].map({'Y': 1, 'N': 0})
     df['노선_우선'] = df['노선'].apply(lambda x: 1 if any(line in str(x) for line in ['3', '7', '9']) else 0)
@@ -207,7 +245,7 @@ if submitted:
     df_filtered = df[df['실사용가격'] <= budget_upper].copy()
 
     # 단일 단지 중복 제거 및 상위 3개 추천
-    df_filtered = df_filtered.sort_values(by=["점수", "역세권_우선", "노선_우선", "세대수"], ascending=[False, False, False, False])
+    df_filtered = df_filtered.sort_values(by=["점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"], ascending=[False, False, False, False, False])
     df_filtered = df_filtered.drop_duplicates(subset=['단지명'], keep='first')
 
     # 추천 단지 부족 시 예산 초과 단지 포함
@@ -215,7 +253,7 @@ if submitted:
     if len(top3) < 3:
         remaining_slots = 3 - len(top3)
         extra_df = df[(df['실사용가격'] > budget_upper) & (df['실사용가격'] <= budget_cap)]
-        extra_df = extra_df.sort_values(by=["점수", "역세권_우선", "노선_우선", "세대수"], ascending=[False, False, False, False])
+        extra_df = extra_df.sort_values(by=["점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"], ascending=[False, False, False, False, False])
         extra_df = extra_df.drop_duplicates(subset=['단지명'], keep='first')
         extra_df = extra_df[~extra_df['단지명'].isin(top3['단지명'])]
         top3 = pd.concat([top3, extra_df.head(remaining_slots)])
@@ -236,7 +274,7 @@ if submitted:
 
     # 추천 결과 출력
     st.markdown("### 추천 단지")
-    for _, row in top3.iterrows():
+    for idx, row in top3.iterrows():
         단지명 = row['단지명']
         준공 = int(row['준공연도']) if pd.notna(row['준공연도']) else "미상"
         세대 = int(row['세대수']) if pd.notna(row['세대수']) else "미상"
@@ -250,7 +288,10 @@ if submitted:
         조건설명, _ = get_condition_note(cash, loan, area_group, condition, lines, household, row)
         추천이유 = classify_recommendation(row, budget_upper)
 
-        # 가격 출력 형식 수정: 별도의 줄로 분리
+        # 조건 설명과 추천 이유 통합
+        통합_설명 = f"{조건설명} {추천이유}"
+
+        # 가격 출력
         실거래출력 = f"가격: {실거래} (거래일: {거래일})"
         if 출처 == "호가":
             호가출력 = f"현재 호가: {호가}"
@@ -259,13 +300,12 @@ if submitted:
         else:
             호가출력 = "현재 호가: 정보 없음"
 
-        st.markdown(f"""#### {단지명}
+        st.markdown(f"""#### {단지명} ({idx + 1}순위)
 - 평형: {평형}평 (전용면적: {round(면적, 1)}㎡)
 - 준공연도: {준공} / 세대수: {세대}
 - {실거래출력}
 - {호가출력}
-- 조건 평가: {조건설명}
-- 추천 이유: {추천이유}
+- {통합_설명}
 """)
 
     st.markdown("---")
