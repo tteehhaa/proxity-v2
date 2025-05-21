@@ -69,7 +69,6 @@ if submitted:
 
     df["점수"] = df.apply(lambda row: score_complex(row, total_budget, area_group, condition, lines, household), axis=1)
 
-    # 조건 만족 + 예산 이내 단지 중 점수 & 세대수 우선 정렬
     df_filtered = df[df['현재호가'] <= total_budget].copy()
     top3 = df_filtered.sort_values(by=["점수", "세대수"], ascending=[False, False]).head(3)
 
@@ -94,6 +93,14 @@ if submitted:
         tag_list.append(유형)
         tag_str = " · ".join(tag_list)
 
+        # 컨디션 충족 여부 설명 분기
+        matched_condition = condition in str(row.get("건축유형", ""))
+        if matched_condition:
+            condition_note = f"💡 선택하신 "{condition}" 컨디션을 충족하는 단지입니다."
+        else:
+            condition_note = f"⚠️ "{condition}" 조건에 정확히 부합하지 않지만, 
+예산과 유사 조건을 고려해 추천드리는 대안 단지입니다."
+
         st.markdown(f"""#### 🏢 {단지명}
 - 전용면적: {면적}㎡ / 준공연도: {준공} / 세대수: {세대}세대
 - 최근 실거래가: {실거래}억 / 현재 호가: {호가}억
@@ -103,6 +110,7 @@ if submitted:
 
 📍 선택하신 컨디션: **{condition}**, 평형: **{area_group}**, 규모: **{household}**
 
+{condition_note}
+
 💡 조건 충족도와 단지 규모 기준으로 우선순위 정렬된 단지입니다.
 """)
-
