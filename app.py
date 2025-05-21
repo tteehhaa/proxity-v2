@@ -148,11 +148,11 @@ if submitted:
     # 예산 범위 내 단지 필터링
     df_filtered = df[df['실사용가격'] <= budget_upper].copy()
 
-    # 3개 미만일 경우 예산 초과 일부 포함
-    if len(df_filtered) < 3:
-        extra = df[(df['실사용가격'] > budget_upper) & (df['실사용가격'] <= budget_cap)]
-        df_filtered = pd.concat([df_filtered, extra])
-        df_filtered = df_filtered.drop_duplicates(subset=['단지명', '전용면적'])
+        # 3개 미만일 경우 예산 초과 일부 포함
+        if len(df_filtered) < 3:
+            extra = df[(df['실사용가격'] > budget_upper) & (df['실사용가격'] <= budget_cap)]
+            df_filtered = pd.concat([df_filtered, extra])
+            df_filtered = df_filtered.drop_duplicates(subset=['단지명', '전용면적'])
 
     # 같은 단지 중복 제거, 세대수 기준 정렬
     top3 = df_filtered.sort_values(by=["세대수", "점수"], ascending=[False, False])\
