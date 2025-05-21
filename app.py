@@ -71,17 +71,17 @@ if submitted:
     df[['단지명', '준공연도', '세대수']] = df[['단지명', '준공연도', '세대수']].fillna(method="ffill")
 
     # 숫자형 변환 (쉼표 있는 경우 대비 가능)
-    df['현재호가'] = pd.to_numeric(df['현재호가'], errors='coerce')
+    df['20250521호가'] = pd.to_numeric(df['20250521호가'], errors='coerce')
     df['2025.05_보정_추정실거래가'] = pd.to_numeric(df['2025.05_보정_추정실거래가'], errors='coerce')
 
     # 점수 계산
     df["점수"] = df.apply(lambda row: score_complex(row, total_budget, area_group, year_group, lines, household), axis=1)
 
     # 예산 이내 단지만 추천 대상
-    df_filtered = df[df['현재호가'] <= total_budget].copy()
+    df_filtered = df[df['20250521호가'] <= total_budget].copy()
 
     # 예산 꽉 채운 순 → 점수 순
-    top3 = df_filtered.sort_values(by=["현재호가", "점수"], ascending=[False, False]).head(3)
+    top3 = df_filtered.sort_values(by=["20250521호가", "점수"], ascending=[False, False]).head(3)
 
     st.markdown("### 🎯 추천 단지")
 
@@ -92,7 +92,7 @@ if submitted:
         세대 = int(row['세대수']) if pd.notna(row['세대수']) else "미상"
         면적 = round(row['전용면적'], 2)
         실거래 = row['2025.05_보정_추정실거래가']
-        호가 = row['현재호가']
+        호가 = row['20250521호가']
 
         # 단지 조건 태그
         tag_list = []
