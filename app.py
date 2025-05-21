@@ -162,9 +162,9 @@ if submitted:
     top3['추천이유'] = top3.apply(classify_recommendation, axis=1)
 
   # 조건 불일치 안내 메시지 출력
-    condition_mismatch = False
+condition_mismatch = False
 
-    for _, row in top3.iterrows():
+for _, row in top3.iterrows():
         
 
 # 현재 호가가 없을 경우 → 같은 단지의 다른 평형 호가 추정
