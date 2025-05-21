@@ -6,7 +6,6 @@ st.set_page_config(page_title="잠원동에서 나에게 맞는 집", layout="ce
 
 st.markdown("""
 # 🏠 매수 아파트 단지 탐색기 - 잠원동 편
-#### Proxity가 지금 조건에 맞는 단지를 추천합니다.
 """)
 
 # 사용자 입력
