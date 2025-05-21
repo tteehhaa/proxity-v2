@@ -53,6 +53,8 @@ def score_complex(row, area_group, condition, lines, household):
     return score
 
 def round_price(val): return f"{round(val, 2):.2f}억" if not pd.isna(val) and val >= 1.0 else "정보 없음"
+def get_pyeong(area):
+    return str(int(round(area / 3.3))) + "평"
 
 if submitted:
     df = pd.read_csv("data/jw_v0.13_streamlit_ready.csv")
