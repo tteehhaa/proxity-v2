@@ -167,12 +167,20 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
     return condition_text, condition_mismatch
 
 def classify_recommendation(row, budget_upper, total_budget):
-    """추천 이유 분류: 예산 범위 및 10% 조건 반영"""
+    """추천 이유 분류: 예산 범위 및 10% 조건 반영, 매물 여부 반영"""
     budget_ten_percent = total_budget * 0.1  # 예산의 10%
+    has_naver_listing = row['가격출처'] == "호가"  # 네이버 매물 여부 확인
+
     if row['실사용가격'] <= total_budget:
-        return "입력하신 예산 범위 내에 속하는 단지입니다."
+        if has_naver_listing:
+            return "입력하신 예산 범위 내에 속하는 단지입니다."
+        else:
+            return "입력하신 조건을 고려할 때, 매물이 있다면 고려 가능합니다."
     elif row['실사용가격'] <= budget_upper:
-        return "입력하신 예산의 10% 이내에 속하는 단지입니다."
+        if has_naver_listing:
+            return "입력하신 예산의 10% 이내에 속하는 단지입니다."
+        else:
+            return "입력하신 조건을 고려할 때, 매물이 있다면 고려 가능합니다."
     else:
         additional_budget = round(row['실사용가격'] - budget_upper, 2)
         return f"입력하신 예산을 초과하나, 조건에 부합해 추천드립니다. 약 {additional_budget}억의 추가 예산이 필요합니다."
