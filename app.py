@@ -56,8 +56,8 @@ def estimate_similar_asking_price(row, df):
             closest_unit = similar_units.loc[similar_units['면적차이'].idxmin()]
             closest_area = closest_unit['전용면적']
             closest_price = closest_unit['현재호가']
-            # 면적 비율로 환산, 프리미엄 계수(1.05) 적용
-            estimated_price = (closest_price / closest_area) * row['전용면적'] * 1.05
+            # 면적 비율로 환산 (프리미엄 계수 제거)
+            estimated_price = (closest_price / closest_area) * row['전용면적']
             return estimated_price, "동일단지 유사평형 호가 추정", closest_area
     return row['현재호가'], "호가", row['전용면적']
 
