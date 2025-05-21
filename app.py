@@ -154,6 +154,8 @@ if submitted:
         df_filtered = pd.concat([df_filtered, extra])
         df_filtered = df_filtered.drop_duplicates(subset=['단지명', '전용면적'])
 
+    top3 = pd.DataFrame()
+
     # 같은 단지 중복 제거, 세대수 기준 정렬
     if not df_filtered.empty and '세대수' in df_filtered.columns and '점수' in df_filtered.columns:
         top3 = df_filtered.sort_values(by=["세대수", "점수"], ascending=[False, False])\
