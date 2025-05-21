@@ -21,7 +21,7 @@ with st.form("user_input_form"):
     col1, col2 = st.columns(2)
     with col1:
         cash = st.number_input("현금 (예: 16.0억)", min_value=0.0, max_value=100.0, value=16.0, step=0.5)
-        loan = st.number_input("주택담보대출 가능 금액 (예: 12.0억)", min_value=0.0, max_value=30.0, value=12.0, step=0.5)
+        loan = st.number_input("주택담보대출 가능 금액 (예: 12.0억)", min_value=0.0, max_value=30.0, value=24.0, step=0.5)
         area_group = st.selectbox("원하는 평형대", ["상관없음", "10평 이하", "20평대", "30평대", "40평 이상"])
         condition = st.selectbox("건물 컨디션", ["상관없음", "신축", "기축", "리모델링", "재건축"])
     with col2:
@@ -303,13 +303,13 @@ if submitted:
         # 가격 출력
         실거래출력 = f"가격: {실거래} (거래일: {거래일})"
         if 출처 == "호가":
-            호가출력 = f"현재 호가: {호가}"
+            호가출력 = f"현재 호가: {호가} (네이버 매물 호가)"
         elif 출처 == "동일단지 유사평형 호가 추정":
-            호가출력 = f"현재 호가: {호가}로 추정 (전용면적: {호가전용면적}㎡)"
+            호가출력 = f"추정가: {호가} (임의 추정가, 전용면적: {호가전용면적}㎡ 기준)"
         else:
-            호가출력 = "현재 호가: 정보 없음"
+            호가출력 = "가격 정보: 없음"
 
-        st.markdown(f"""#### {단지명}
+        st.markdown(f"""#### {단지명} ({idx + 1}순위)
 - 평형: {평형}평 (전용면적: {round(면적, 1)}㎡)
 - 준공연도: {준공} / 세대수: {세대}
 - {실거래출력}
