@@ -159,9 +159,9 @@ if submitted:
         top3 = df_filtered.sort_values(by=["세대수", "점수"], ascending=[False, False])\
                           .drop_duplicates(subset=["단지명"])\
                           .head(3)
+        top3['추천이유'] = top3.apply(classify_recommendation, axis=1)
     else:
-        top3 = pd.DataFrame()  # 비어있는 추천 결과 처리
-
+        top3 = pd.DataFrame()  # 빈 DataFrame으로 초기화
 
 top3['추천이유'] = top3.apply(classify_recommendation, axis=1)
 
