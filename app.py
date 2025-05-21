@@ -95,7 +95,7 @@ if submitted:
 
         matched_condition = condition in str(row.get("건축유형", ""))
         if matched_condition:
-            condition_note = f"💡 선택하신 "{condition}" 컨디션을 충족하는 단지입니다."
+            condition_note = f"💡 선택하신 \"{condition}\" 컨디션을 충족하는 단지입니다."
         else:
             condition_note = f"""⚠️ "{condition}" 조건에 정확히 부합하지 않지만,
 예산과 유사 조건을 고려해 추천드리는 대안 단지입니다."""
