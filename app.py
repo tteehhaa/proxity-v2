@@ -117,7 +117,7 @@ def score_correlated_factors(row, area_group, condition, lines, household):
 def round_price(val, price_type, is_estimated=False):
     """가격을 억 단위로 반올림, 실거래가는 범위 없이 정확한 금액, 호가/추정가는 +10% 범위 포함"""
     if pd.isna(val) or val < 1.0:
-        return "정보 없음"
+        return "현재 매물 없으나, 매물이 나올 경우 예산 범위 내로 추정"
     if price_type == "실거래가":
         return f"{round(val, 2):.2f}억"
     if price_type in ["호가", "동일단지 유사평형 호가 추정"] or is_estimated:
@@ -273,7 +273,7 @@ if submitted:
     # 조건 불일치 메시지
     if condition_mismatch:
         st.markdown("""
-        **안내**: 입력하신 조건(평형, 컨디션, 노선, 세대수)에 정확히 부합하는 단지는 없어 일부 조건을 완화해 추천드립니다.
+        **안내**: 입력하신 조건(평형, 컨디션, 노선, 세대수)에 정확히 부합하는 단지는 없는 경우 일부 조건을 완화해 추천드립니다.
         """)
 
     # 추천 결과 출력 (텍스트 형식)
