@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import math
 import os
 
 # Streamlit 페이지 설정
@@ -52,18 +53,18 @@ def estimate_similar_asking_price(row, df):
     """동일 단지 내 유사 평형 호가 추정"""
     if pd.isna(row['현재호가']):
         complex_name = row['단지명']
-        target_area = row['전용면적']
+        target_area = math.floor(row['전용면적'])  # 전용면적 소수점 이하 버림
         similar_units = df[(df['단지명'] == complex_name) & df['현재호가'].notna()]
         if not similar_units.empty:
-            # 가장 가까운 면적(±5㎡) 선택
-            similar_units['면적차이'] = abs(similar_units['전용면적'] - target_area)
+            # 전용면적 소수점 이하 버림 후 비교
+            similar_units['면적차이'] = abs(similar_units['전용면적'].apply(math.floor) - target_area)
             closest_unit = similar_units.loc[similar_units['면적차이'].idxmin()]
             closest_area = closest_unit['전용면적']
             closest_price = closest_unit['현재호가']
             # 면적 비율로 환산, 프리미엄 계수(1.05) 적용
-            estimated_price = (closest_price / closest_area) * target_area * 1.05
-            return estimated_price, "동일단지 유사평형 호가 추정"
-    return row['현재호가'], row.get('가격출처', '실거래가')
+            estimated_price = (closest_price / closest_area) * row['전용면적'] * 1.05
+            return estimated_price, "동일단지 유사평형 호가 추정", closest_area
+    return row['현재호가'], "호가", row['전용면적']
 
 def score_complex(row, cash, loan, area_group, condition, lines, household):
     """단지 점수 계산: 사용자 조건과 데이터 일치도 기반"""
@@ -97,10 +98,10 @@ def round_price(val, price_type, is_estimated=False):
     """가격을 억 단위로 반올림, 호가/추정가는 ±10% 범위 포함"""
     if pd.isna(val) or val < 1.0:
         return "정보 없음"
-    if price_type in ['호가', '동일단지 유사평형 호가 추정'] or is_estimated:
+    if price_type == "동일단지 유사평형 호가 추정":
         lower = round(val * 0.9, 2)
         upper = round(val * 1.1, 2)
-        return f"{round(val, 2):.2f}억 ({lower:.2f}~{upper:.2f}억)"
+        return f"{lower:.2f}~{upper:.2f}억"
     return f"{round(val, 2):.2f}억"
 
 def get_condition_note(cash, loan, area_group, condition, lines, household, row):
@@ -183,21 +184,21 @@ if submitted:
     df = df[df['실거래가'] <= budget_cap].copy()
 
     # 동일 단지 유사 평형 호가 추정
-    df[['현재호가', '가격출처']] = df.apply(lambda row: pd.Series(estimate_similar_asking_price(row, df)), axis=1)
+    df[['현재호가', '가격출처', '호가전용면적']] = df.apply(lambda row: pd.Series(estimate_similar_asking_price(row, df)), axis=1)
 
     # 실사용가격 설정: 실거래가 > 호가 > 추정가 우선순위
     df['실사용가격'] = df['실거래가']
-    df['가격출처'] = df['가격출처'].fillna('실거래가')
+    df['가격출처_실사용'] = df['가격출처'].fillna('실거래가')
     mask_호가 = df['실사용가격'].isna() & df['현재호가'].notna()
     df.loc[mask_호가, '실사용가격'] = df['현재호가']
-    df.loc[mask_호가, '가격출처'] = df['가격출처']
+    df.loc[mask_호가, '가격출처_실사용'] = df['가격출처']
     mask_추정 = df['실사용가격'].isna() & df['추정가'].notna()
     df.loc[mask_추정, '실사용가격'] = df['추정가']
-    df.loc[mask_추정, '가격출처'] = '추정'
+    df.loc[mask_추정, '가격출처_실사용'] = '추정'
 
     # 추정가 허용 상한
     df['추정가허용상한'] = df['실사용가격'] * 1.2
-    df = df[~((df['가격출처'] == '추정') & (df['추정가허용상한'] > budget_upper))]
+    df = df[~((df['가격출처_실사용'] == '추정') & (df['추정가허용상한'] > budget_upper))]
 
     # 오래된 거래 제외 (2024년 이후)
     df = df[(df['거래연도'].isna()) | (df['거래연도'] >= 2024)]
@@ -241,19 +242,28 @@ if submitted:
         세대 = int(row['세대수']) if pd.notna(row['세대수']) else "미상"
         면적 = row['전용면적']
         평형 = get_pyeong(면적)
-        실거래 = round_price(row['실사용가격'], row['가격출처'], is_estimated=(row['가격출처'] == '동일단지 유사평형 호가 추정'))
+        실거래 = round_price(row['실사용가격'], row['가격출처_실사용'], is_estimated=(row['가격출처_실사용'] == '동일단지 유사평형 호가 추정'))
         거래일 = row['거래일'].strftime("%Y.%m.%d") if pd.notna(row['거래일']) and row['거래연도'] >= 2024 else "최근 거래 없음"
+        호가 = round_price(row['현재호가'], row['가격출처'], is_estimated=(row['가격출처'] == '동일단지 유사평형 호가 추정'))
+        호가전용면적 = round(row['호가전용면적'], 1) if pd.notna(row['호가전용면적']) else 면적
         출처 = row['가격출처']
         조건설명, _ = get_condition_note(cash, loan, area_group, condition, lines, household, row)
         추천이유 = classify_recommendation(row, budget_upper)
 
         # 가격 출력 형식 수정
-        가격출력 = f"실거래가: {실거래} (거래일: {거래일})" if 출처 == '실거래가' else f"호가: {실거래} (출처: {출처}, 거래일: {거래일})"
+        실거래출력 = f"가격: {실거래} (거래일: {거래일})"
+        if 출처 == "호가":
+            호가출력 = f"현재 호가: {호가}"
+        elif 출처 == "동일단지 유사평형 호가 추정":
+            호가출력 = f"현재 호가: {호가}로 추정 (전용면적: {호가전용면적}㎡)"
+        else:
+            호가출력 = "현재 호가: 정보 없음"
+        가격출력 = f"{실거래출력} | {호가출력}"
 
         st.markdown(f"""#### {단지명}
 - 평형: {평형}평 (전용면적: {round(면적, 1)}㎡)
 - 준공연도: {준공} / 세대수: {세대}
-- 가격: {가격출력}
+- {가격출력}
 - 조건 평가: {조건설명}
 - 추천 이유: {추천이유}
 """)
