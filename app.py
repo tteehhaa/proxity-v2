@@ -20,7 +20,7 @@ with st.form("user_input_form"):
         area_group = st.selectbox("원하는 평형대", ["상관없음", "10평 이하", "20평대", "30평대", "40평 이상"])
         condition = st.selectbox("건물 컨디션", ["상관없음", "신축", "기축", "리모델링", "재건축"])
     with col2:
-        lines = st.multiselect("선호 지하철 노선", ["상관없음", "3호선", "7호선", "9호선", "신분당선"], default=["상관없음"])
+        lines = st.multiselect("선호 지하철 노선", ["상관없음", "3호선", "7호선", "9호선", "신분당선"])
         household = st.selectbox("단지 규모", ["대단지", "소단지", "상관없음"])
 
     total_budget = cash + loan
@@ -92,7 +92,24 @@ if submitted:
 
     top3 = df_filtered.sort_values(by=["세대수", "점수"], ascending=[False, False]).drop_duplicates(subset=["단지명"]).head(3)
 
+    # 추천 단지 유형 구분 및 라벨 추가
+    def classify_recommendation(row):
+    if row['점수'] >= 4 and row['실사용가격'] <= budget_upper:
+        return "예산과 조건을 모두 충족한 단지입니다."
+    elif row['실사용가격'] <= budget_upper:
+        return "조건 일부가 부합하지 않지만, 예산에 맞춰 추천된 단지입니다."
+    else:
+        return "조건을 충족하지만 예산을 초과한 단지입니다."
+
+    top3['추천이유'] = top3.apply(classify_recommendation, axis=1)
+
     st.markdown("### 추천 단지")
+    # 신축 조건인데 추천 단지가 신축이 아닐 경우 안내 멘트 출력
+    if condition == "신축":
+        has_new = any("신축" in str(row.get("건축유형", "")) for _, row in top3.iterrows())
+    if not has_new:
+        st.info("요청하신 '신축' 조건에 정확히 부합하는 단지는 현재 없습니다. 조건 중 일부를 완화하여 대안 단지를 추천드립니다.")
+
     for _, row in top3.iterrows():
         단지명 = row['단지명']
         준공 = int(row['준공연도']) if pd.notna(row['준공연도']) else "미상"
