@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import os
 
 # Streamlit 페이지 설정
 st.set_page_config(page_title="잠원동 아파트 단지 추천기 (2025년 5월 v0.1)", layout="centered")
@@ -50,7 +51,7 @@ def get_pyeong(area):
 def score_complex(row, cash, loan, area_group, condition, lines, household):
     """단지 점수 계산: 사용자 조건과 데이터 일치도 기반"""
     score = 0
-    pyeong = get_pyeong(row["전용면적"])  # 평형 계산
+    pyeong = get_pyeong(row["전용면적"])
     p_min, p_max = get_area_range(area_group)
     if p_min <= row["전용면적"] <= p_max:
         score += 1.5
@@ -109,14 +110,27 @@ def classify_recommendation(row, budget_upper):
 
 # --- 데이터 처리 및 출력 ---
 if submitted:
-    # 데이터 로드 (jw_v0.13_streamlit_ready.csv 대신 v4 결과 사용)
-    df = pd.read_excel("estimated_prices_2025_03_v4.xlsx")
+    # 데이터 로드
+    data_file = "data/jw_v0.13_streamlit_ready.csv"
+    try:
+        if os.path.exists(data_file):
+            df = pd.read_csv(data_file)
+        else:
+            st.error(f"'{data_file}' 파일을 찾을 수 없습니다. 관리자에게 문의해주세요.")
+            st.stop()
+    except Exception as e:
+        st.error(f"데이터 로드 중 오류 발생: {str(e)}")
+        st.stop()
+
+    # 데이터 전처리
     df[['단지명', '준공연도', '세대수']] = df[['단지명', '준공연도', '세대수']].fillna(method="ffill")
-    df['실거래가'] = pd.to_numeric(df['2025.03 기준가'], errors='coerce')
+    df['실거래가'] = pd.to_numeric(df['2025.03'], errors='coerce')
+    df['현재호가'] = pd.to_numeric(df['20250521호가'], errors='coerce')
+    df['추정가'] = pd.to_numeric(df['2025.05_보정_추정실거래가'], errors='coerce')
     df['거래일'] = pd.to_datetime(df['거래일'], errors='coerce')
     df['거래연도'] = df['거래일'].dt.year
 
-    # 필터링: 추정가 1억 이상
+    # 필터링: 가격 1억 이상
     df = df[df['실거래가'] >= 1.0]
 
     # 점수 계산
@@ -125,13 +139,19 @@ if submitted:
     # 예산 상한 필터링
     df = df[df['실거래가'] <= budget_cap].copy()
 
-    # 실사용가격 설정: 실거래가 우선, 추정가 대체
+    # 실사용가격 설정: 실거래가 > 호가 > 추정가 우선순위
     df['실사용가격'] = df['실거래가']
-    df['가격출처'] = df['추정방식']
+    df['가격출처'] = '실거래가'
+    mask_호가 = df['실사용가격'].isna() & df['현재호가'].notna()
+    df.loc[mask_호가, '실사용가격'] = df['현재호가']
+    df.loc[mask_호가, '가격출처'] = '호가'
+    mask_추정 = df['실사용가격'].isna() & df['추정가'].notna()
+    df.loc[mask_추정, '실사용가격'] = df['추정가']
+    df.loc[mask_추정, '가격출처'] = '추정'
 
-    # 추정가 허용 상한 (예산 +20% 또는 2억)
+    # 추정가 허용 상한
     df['추정가허용상한'] = df['실사용가격'] * 1.2
-    df = df[~((df['가격출처'] != '실거래_존재') & (df['추정가허용상한'] > budget_upper))]
+    df = df[~((df['가격출처'] == '추정') & (df['추정가허용상한'] > budget_upper))]
 
     # 오래된 거래 제외 (2024년 이후)
     df = df[(df['거래연도'].isna()) | (df['거래연도'] >= 2024)]
@@ -148,7 +168,7 @@ if submitted:
         세대 = int(row['세대수']) if pd.notna(row['세대수']) else "미상"
         면적 = row['전용면적']
         평형 = get_pyeong(면적)
-        실거래 = round_price(row['실거래가'])
+        실거래 = round_price(row['실사용가격'])
         거래일 = row['거래일'].strftime("%Y.%m.%d") if pd.notna(row['거래일']) and row['거래연도'] >= 2024 else "최근 거래 없음"
         출처 = row['가격출처']
         조건설명 = get_condition_note(cash, loan, area_group, condition, lines, household, row)
