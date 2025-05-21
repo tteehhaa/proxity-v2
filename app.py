@@ -161,10 +161,34 @@ if submitted:
 
     top3['추천이유'] = top3.apply(classify_recommendation, axis=1)
 
-    # 신축 조건이지만 없을 경우 안내
-    has_new = any("신축" in str(row.get("건축유형", "")) for _, row in top3.iterrows())
-    if condition == "신축" and not has_new:
-        st.info("요청하신 '신축' 조건에 정확히 부합하는 단지는 현재 없습니다. 조건 중 일부를 완화하여 대안 단지를 추천드립니다.")
+  # 조건 불일치 안내 메시지 출력
+condition_mismatch = False
+
+for _, row in top3.iterrows():
+    # 1. 평형 조건 미일치
+    if area_group != "상관없음":
+        actual_p = int(float(row.get("평형", get_pyeong(row["전용면적"])).replace("평", "")))
+        p_min, p_max = get_area_range(area_group)
+        if not (p_min <= actual_p <= p_max):
+            condition_mismatch = True
+
+    # 2. 건물 컨디션 미일치
+    if condition != "상관없음" and condition not in str(row.get("건축유형", "")):
+        condition_mismatch = True
+
+    # 3. 노선 미일치
+    if "상관없음" not in lines:
+        if row["역세권"] != "Y" or not any(line in str(row.get("노선", "")) for line in lines):
+            condition_mismatch = True
+
+    # 4. 세대수 미일치
+    if household == "대단지" and row["세대수"] < 1000:
+        condition_mismatch = True
+    elif household == "소단지" and row["세대수"] >= 1000:
+        condition_mismatch = True
+
+if condition_mismatch:
+    st.info("입력하신 조건에 정확히 부합하는 단지는 현재 없습니다. 조건 중 일부를 완화하여 가능한 단지를 추천드립니다.")
 
     st.markdown("### 추천 단지")
     for _, row in top3.iterrows():
