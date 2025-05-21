@@ -31,7 +31,7 @@ with st.form("user_input_form"):
     # 예산 계산
     total_budget = cash + loan
     budget_upper = total_budget * 1.1  # +10% 추가 예산
-    budget_cap = total_budget * 1.3   # 예산 초과 단지 포함용 (현재 호가 기준으로는 사용 안 함)
+    budget_cap = total_budget * 1.3   # 예산 초과 단지 포함용
 
     submitted = st.form_submit_button("지금 추천 받기")
 
@@ -51,12 +51,10 @@ def estimate_similar_asking_price(row, df):
         target_area = math.floor(row['전용면적'])  # 전용면적 소수점 이하 버림
         similar_units = df[(df['단지명'] == complex_name) & df['현재호가'].notna()]
         if not similar_units.empty:
-            # 전용면적 소수점 이하 버림 후 비교
             similar_units['면적차이'] = abs(similar_units['전용면적'].apply(math.floor) - target_area)
             closest_unit = similar_units.loc[similar_units['면적차이'].idxmin()]
             closest_area = closest_unit['전용면적']
             closest_price = closest_unit['현재호가']
-            # 면적 비율로 환산 (프리미엄 계수 제거)
             estimated_price = (closest_price / closest_area) * row['전용면적']
             return estimated_price, "동일단지 유사평형 호가 추정", closest_area
     return row['현재호가'], "호가", row['전용면적']
@@ -64,14 +62,13 @@ def estimate_similar_asking_price(row, df):
 def score_complex(row, cash, loan, area_group, condition, lines, household):
     """단지 점수 계산: 사용자 조건과 데이터 일치도 기반"""
     score = 0
-    pyeong = row["평형"]  # 평형 열 사용
+    pyeong = row["평형"]
     p_min, p_max = get_area_range(area_group)
     if p_min <= pyeong <= p_max:
         score += 1.5
     elif area_group == "상관없음":
         score += 1
     building_type = str(row.get("건축유형", "")).strip()
-    # 신축 조건 강화: 준공연도 2018년 이후 또는 '신축' 포함
     if condition == "신축" and (row['준공연도'] >= 2018 or building_type == "신축"):
         score += 2.5
     elif condition == "상관없음" or condition == building_type:
@@ -117,9 +114,9 @@ def round_price(val, price_type, is_estimated=False):
     if pd.isna(val) or val < 1.0:
         return "정보 없음"
     if price_type == "실거래가":
-        return f"{round(val, 2):.2f}억"  # 실거래가는 범위 없이 정확한 금액
+        return f"{round(val, 2):.2f}억"
     if price_type in ["호가", "동일단지 유사평형 호가 추정"] or is_estimated:
-        upper = round(val * 1.1, 2)  # +10% 범위
+        upper = round(val * 1.1, 2)
         return f"{round(val, 2):.2f}~{upper:.2f}억"
     return f"{round(val, 2):.2f}억"
 
@@ -161,9 +158,11 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
     condition_text = "입력하신 조건(" + ", ".join(notes) + ")에 따라 추천된 단지입니다." if notes else "입력하신 조건을 기반으로 추천된 단지입니다."
     return condition_text, condition_mismatch
 
-def classify_recommendation(row, budget_upper):
+def classify_recommendation(row, budget_upper, budget_cap):
     """추천 이유 분류"""
-    if row['실사용가격'] > budget_upper:
+    if row['실사용가격'] > budget_upper and row['실사용가격'] <= budget_cap:
+        return "예산 상한을 약간 초과하나, 조건에 부합해 추가 추천된 단지입니다."
+    elif row['실사용가격'] > budget_upper:
         return "실거래가는 예산 내에 있지만 현재 호가가 높아 구매가 어려울 수 있습니다."
     elif row['점수'] >= 4 and row['실사용가격'] <= budget_upper:
         return "예산과 조건을 모두 충족한 단지입니다."
@@ -191,9 +190,7 @@ if submitted:
     df['추정가'] = pd.to_numeric(df['2025.05_보정_추정실거래가'], errors='coerce')
     df['거래일'] = pd.to_datetime(df['거래일'], errors='coerce')
     df['거래연도'] = df['거래일'].dt.year
-    # 건축유형 표준화: 빈 값 처리
     df['건축유형'] = df.apply(lambda row: '신축' if pd.notna(row['준공연도']) and row['준공연도'] >= 2018 else row.get('건축유형', '기축'), axis=1)
-    # 동일 단지 정보 공유
     df[['건축유형', '역세권', '노선']] = df.groupby('단지명')[['건축유형', '역세권', '노선']].fillna(method="ffill")
 
     # 필터링: 가격 1억 이상
@@ -201,27 +198,19 @@ if submitted:
 
     # 점수 계산
     df["점수"] = df.apply(lambda row: score_complex(row, cash, loan, area_group, condition, lines, household), axis=1)
-
-    # 상관 요소 점수 계산
     df["상관_점수"] = df.apply(lambda row: score_correlated_factors(row, area_group, condition, lines, household), axis=1)
-
-    # 세대수와 준공연도 통합 점수 계산
-    min_households = df['세대수'].min()
-    max_households = df['세대수'].max()
-    min_year = df['준공연도'].min()
-    max_year = df['준공연도'].max()
+    min_households, max_households = df['세대수'].min(), df['세대수'].max()
+    min_year, max_year = df['준공연도'].min(), df['준공연도'].max()
     df['세대수_점수'] = (df['세대수'] - min_households) / (max_households - min_households) if max_households != min_households else 0
     df['준공연도_점수'] = (df['준공연도'] - min_year) / (max_year - min_year) if max_year != min_year else 0
     df['통합_점수'] = 0.6 * df['세대수_점수'] + 0.4 * df['준공연도_점수']
-
-    # 역세권 및 노선 우선순위
     df['역세권_우선'] = df['역세권'].map({'Y': 1, 'N': 0})
     df['노선_우선'] = df['노선'].apply(lambda x: 1 if any(line in str(x) for line in ['3', '7', '9']) else 0)
 
     # 동일 단지 유사 평형 호가 추정
     df[['현재호가', '가격출처', '호가전용면적']] = df.apply(lambda row: pd.Series(estimate_similar_asking_price(row, df)), axis=1)
 
-    # 실사용가격 설정: 실거래가 > 호가 > 추정가 우선순위
+    # 실사용가격 설정
     df['실사용가격'] = df['실거래가']
     df['가격출처_실사용'] = df['가격출처'].fillna('실거래가')
     mask_호가 = df['실사용가격'].isna() & df['현재호가'].notna()
@@ -232,26 +221,35 @@ if submitted:
     df.loc[mask_추정, '가격출처_실사용'] = '추정'
 
     # 현재 호가 기준 필터링
-    df['호가_상한'] = df['현재호가'] * 1.1  # 호가의 +10% 상한
-    df['추정가_상한'] = df['추정가'] * 1.1  # 추정가의 +10% 상한
-    # 현재 호가가 있으면 호가 상한, 없으면 추정가 상한으로 필터링
+    df['호가_상한'] = df['현재호가'] * 1.1
+    df['추정가_상한'] = df['추정가'] * 1.1
     df = df[
         (df['호가_상한'].notna() & (df['호가_상한'] <= budget_upper)) | 
         (df['호가_상한'].isna() & df['추정가_상한'].notna() & (df['추정가_상한'] <= budget_upper))
     ].copy()
 
-    # 오래된 거래 제외 (2024년 이후)
+    # 오래된 거래 제외
     df = df[(df['거래연도'].isna()) | (df['거래연도'] >= 2024)]
 
     # 예산 내 단지 필터링
     df_filtered = df[df['실사용가격'] <= budget_upper].copy()
-
-    # 단일 단지 중복 제거 및 상위 3개 추천
     df_filtered = df_filtered.sort_values(by=["점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"], ascending=[False, False, False, False, False])
     df_filtered = df_filtered.drop_duplicates(subset=['단지명'], keep='first')
-
-    # 추천 단지 부족 시 메시지 출력
     top3 = df_filtered.head(3)
+
+    # 단지 2개일 경우 예산 확장
+    if len(top3) == 2:
+        df_extended = df[df['실사용가격'] <= budget_cap].copy()
+        df_extended = df_extended.sort_values(by=["점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"], ascending=[False, False, False, False, False])
+        df_extended = df_extended.drop_duplicates(subset=['단지명'], keep='first')
+        top3 = df_extended.head(3)
+        if len(top3) < 3:
+            st.markdown(f"""
+            **안내**: 현재 잠원동 아파트의 호가가 높아 예산 상한(%.2f억원)을 초과한 단지를 포함해 3개를 추천드립니다.  
+            예산 상한(%.2f억원)을 약간 초과한 단지는 참고용으로만 활용하세요.
+            """ % (budget_upper, budget_cap))
+
+    # 추천 단지 부족 시 메시지
     if len(top3) == 0:
         st.markdown("""
         **안내**: 현재 잠원동 아파트의 호가가 예산 상한(%.2f억원)을 초과해 추천 가능한 단지가 없습니다.  
@@ -261,7 +259,7 @@ if submitted:
         추가 조건 조정이나 상담이 필요하시면 말씀해주세요!
         """ % budget_upper)
         st.stop()
-    elif len(top3) < 3:
+    elif len(top3) < 3 and len(top3) > 0:
         st.markdown("""
         **안내**: 현재 잠원동 아파트의 호가가 높아 예산 상한(%.2f억원)에 맞는 단지가 제한적입니다.  
         아래는 조건에 부합하는 몇 가지 단지입니다. 추가 조건 조정이나 대안을 원하시면 말씀해주세요!
@@ -275,51 +273,47 @@ if submitted:
             condition_mismatch = True
             break
 
-    # 조건 불일치 메시지 출력
+    # 조건 불일치 메시지
     if condition_mismatch:
         st.markdown("""
         **안내**: 입력하신 조건(평형, 컨디션, 노선, 세대수)에 정확히 부합하는 단지는 없어 일부 조건을 완화해 추천드립니다.
         """)
 
-    # 추천 결과 출력
+    # 추천 결과 출력 (표 형식)
     st.markdown("### 추천 단지")
     for idx, row in top3.iterrows():
         단지명 = row['단지명']
         준공 = int(row['준공연도']) if pd.notna(row['준공연도']) else "미상"
         세대 = int(row['세대수']) if pd.notna(row['세대수']) else "미상"
-        평형 = row['평형']  # 평형 열 사용
-        면적 = row['전용면적']
+        평형 = row['평형']
+        면적 = round(row['전용면적'], 1)
         실거래 = round_price(row['실사용가격'], row['가격출처_실사용'], is_estimated=(row['가격출처_실사용'] == '동일단지 유사평형 호가 추정'))
         거래일 = row['거래일'].strftime("%Y.%m.%d") if pd.notna(row['거래일']) and row['거래연도'] >= 2024 else "최근 거래 없음"
         호가 = round_price(row['현재호가'], row['가격출처'], is_estimated=(row['가격출처'] == '동일단지 유사평형 호가 추정'))
         호가전용면적 = round(row['호가전용면적'], 1) if pd.notna(row['호가전용면적']) else 면적
         출처 = row['가격출처']
         조건설명, _ = get_condition_note(cash, loan, area_group, condition, lines, household, row)
-        추천이유 = classify_recommendation(row, budget_upper)
-
-        # 조건 설명과 추천 이유 통합
-        통합_설명 = f"{조건설명} {추천이유}"
+        추천이유 = classify_recommendation(row, budget_upper, budget_cap)
 
         # 가격 출력
-        실거래출력 = f"실거래 가격: {실거래} (거래일: {거래일})"
+        실거래출력 = f"{실거래} (거래일: {거래일})"
         if 출처 == "호가":
-            호가출력 = f"현재 호가: {호가} (네이버 매물 호가)"
+            호가출력 = f"{호가} (네이버 매물 호가)"
         elif 출처 == "동일단지 유사평형 호가 추정":
-            호가출력 = f"추정가: {호가} (임의 추정가, 전용면적: {호가전용면적}㎡ 기준)"
+            호가출력 = f"{호가} (전용면적: {호가전용면적}㎡ 기준, 이전 실거래를 기반으로 계산된 임의 추정가로 시장 상황은 다를 수 있음)"
         else:
-            호가출력 = "가격 정보: 없음"
+            호가출력 = "현재 매물은 없으나, 이전 실거래에 따라 추천되었으며, 매물이 나올 경우 이전 실거래와 현재 매물 가격은 다를 수 있음"
 
-        st.markdown(f"""#### {단지명}
-- 평형: {평형}평 (전용면적: {round(면적, 1)}㎡)
-- 준공연도: {준공} / 세대수: {세대}
-- {실거래출력}
-- {호가출력}
-- {통합_설명}
-""")
+        # 표 형식으로 출력
+        data = {
+            "항목": ["단지명", "평형", "전용면적", "준공연도", "세대수", "실거래 가격", "현재 호가/추정가", "추천 이유"],
+            "내용": [단지명, f"{평형}평", f"{면적}㎡", 준공, 세대, 실거래출력, 호가출력, f"{조건설명} {추천이유}"]
+        }
+        st.table(pd.DataFrame(data))
 
     st.markdown("---")
     st.markdown("""
     ※ 위 추천은 사용자의 입력 조건과 2025.03 기준가를 종합하여 제안드린 결과입니다.  
-    ※ 본 추천 결과는 정보 제공 목적으로 이루어지는 테스트이며, 투자 권유 또는 자문이 아닙니다.  
+    ※ 본 추천 결과는 동생의 내집마련을 위한 정보를 제공 목적으로 이루어지는 테스트이며, 투자 권유 또는 자문이 아닙니다.  
     ※ 실제 매수 결정 시에는 본인의 판단과 책임 하에 신중히 검토해주시기 바랍니다.
     """)
