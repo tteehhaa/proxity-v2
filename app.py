@@ -69,7 +69,8 @@ def round_price(val):
     return f"{round(val, 2):.2f}억" if not pd.isna(val) and val >= 1.0 else "정보 없음"
 
 def get_pyeong(area):
-    return round(area / 3.3, 1) + "평"  # 기존에도 있던 함수
+    return f"{round(area / 3.3, 1)}평"
+
 
 def get_condition_note(cash, loan, area_group, condition, lines, household, row):
     notes = []
