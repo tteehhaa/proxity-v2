@@ -19,7 +19,7 @@ with st.form("user_input_form"):
         condition = st.selectbox("건물 컨디션은?", ["상관없음", "신축", "기축", "리모델링", "재건축"])
 
     with col2:
-        lines = st.multiselect("선호하는 지하철 노선은?", ["상관없음", "3호선", "7호선", "9호선", "신분당선"], default=["상관없음"])
+        lines = st.multiselect("선호하는 지하철 노선은?", ["상관없음", "3호선", "7호선", "9호선", "신분당선"])
         household = st.selectbox("단지 규모는?", ["대단지", "소단지", "상관없음"])
 
     total_budget = cash + loan
