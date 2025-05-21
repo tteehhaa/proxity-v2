@@ -165,7 +165,7 @@ if submitted:
     condition_mismatch = False
 
     for _, row in top3.iterrows():
-        condition_mismatch = False  # 초기화
+        
 
 # 현재 호가가 없을 경우 → 같은 단지의 다른 평형 호가 추정
     if pd.isna(row["현재호가"]):
