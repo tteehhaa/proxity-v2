@@ -106,6 +106,7 @@ def classify_recommendation(row):
 
 # --- 처리 및 출력 ---
 if submitted:
+
     df = pd.read_csv("data/jw_v0.13_streamlit_ready.csv")
     df[['단지명', '준공연도', '세대수']] = df[['단지명', '준공연도', '세대수']].fillna(method="ffill")
 
@@ -114,16 +115,19 @@ if submitted:
     df['2025.05_보정_추정실거래가'] = pd.to_numeric(df['2025.05_보정_추정실거래가'], errors='coerce')
     df["점수"] = df.apply(lambda row: score_complex(row, area_group, condition, lines, household), axis=1)
 
-# 실사용가격 초기화
+    # top3 항상 초기화 (조건문 진입 안 해도 이후에서 참조 가능하게 하기 위함)
+    top3 = pd.DataFrame()
+
+    # 실사용가격 초기화
     df['실사용가격'] = df['실거래가']
     df['가격출처'] = '실거래가'
 
-# 실거래가 없음 + 호가 존재 → 호가로 대체
+    # 실거래가 없음 + 호가 존재 → 호가로 대체
     mask_ho = df['실사용가격'].isna() & df['현재호가'].notna()
     df.loc[mask_ho, '실사용가격'] = df['현재호가']
     df.loc[mask_ho, '가격출처'] = '호가'
 
-# 실거래가, 호가 모두 없음 + 거래일이 2024/2025년 아님 → 추정가로 대체
+    # 실거래가, 호가 모두 없음 + 거래일이 2024/2025년 아님 → 추정가로 대체
     mask_est = (
         df['실사용가격'].isna() &
         df['2025.05_보정_추정실거래가'].notna() &
@@ -136,7 +140,6 @@ if submitted:
     # 추정가도 포함한 예산 상한 필터링
     df = df[df['2025.05_보정_추정실거래가'] <= budget_cap]
 
-
     # 추정가 +10%가 예산 내인 경우 추정가 사용
     mask_est = df['실사용가격'].isna() & df['2025.05_보정_추정실거래가'].notna()
     df.loc[mask_est, '실사용가격'] = df['2025.05_보정_추정실거래가'] * 1.1
@@ -144,9 +147,6 @@ if submitted:
 
     # 너무 비싼 추정 단지 제외
     df = df[~((df['가격출처'] == '추정') & (df['실사용가격'] > budget_upper))]
-
-     # top3 항상 초기화 (조건문 진입 안 해도 이후에서 참조 가능하게 하기 위함)
-    top3 = pd.DataFrame()
 
     # 예산 범위 내 단지 필터링
     df_filtered = df[df['실사용가격'] <= budget_upper].copy()
@@ -164,6 +164,7 @@ if submitted:
                           .head(3)
         if not top3.empty:
             top3['추천이유'] = top3.apply(classify_recommendation, axis=1)
+
 
   # 조건 불일치 안내 메시지 출력
 condition_mismatch = False
