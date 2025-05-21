@@ -98,8 +98,9 @@ if submitted:
         if matched_condition:
             condition_note = f"💡 선택하신 "{condition}" 컨디션을 충족하는 단지입니다."
         else:
-            condition_note = f"⚠️ "{condition}" 조건에 정확히 부합하지 않지만, 
-예산과 유사 조건을 고려해 추천드리는 대안 단지입니다."
+            condition_note = f"""⚠️ "{condition}" 조건에 정확히 부합하지 않지만,
+예산과 유사 조건을 고려해 추천드리는 대안 단지입니다."""
+
 
         st.markdown(f"""#### 🏢 {단지명}
 - 전용면적: {면적}㎡ / 준공연도: {준공} / 세대수: {세대}세대
