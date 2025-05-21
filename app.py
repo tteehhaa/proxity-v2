@@ -30,24 +30,19 @@ with st.form("user_input_form"):
 
     # 예산 계산
     total_budget = cash + loan
-    flexible_budget = min(2.0, total_budget * 0.2)
-    budget_upper = total_budget + flexible_budget
-    budget_cap = total_budget * 1.3
+    budget_upper = total_budget * 1.1  # +10% 추가 예산
+    budget_cap = total_budget * 1.3   # 예산 초과 단지 포함용
 
     submitted = st.form_submit_button("지금 추천 받기")
 
 # --- 함수 정의 ---
 def get_area_range(area_group):
-    """평형대(㎡) 범위 반환"""
-    if area_group == "10평 이하": return (0, 19 * 3.3)
-    elif area_group == "20평대": return (20 * 3.3, 29 * 3.3)
-    elif area_group == "30평대": return (30 * 3.3, 39 * 3.3)
-    elif area_group == "40평 이상": return (40 * 3.3, 1000)
+    """평형대 범위 반환 (평형 열 기준)"""
+    if area_group == "10평 이하": return (0, 10)
+    elif area_group == "20평대": return (20, 29.9)
+    elif area_group == "30평대": return (30, 39.9)
+    elif area_group == "40평 이상": return (40, 1000)
     return (0, 1000)
-
-def get_pyeong(area):
-    """전용면적(㎡)을 평으로 변환"""
-    return round(area / 3.3, 1)
 
 def estimate_similar_asking_price(row, df):
     """동일 단지 내 유사 평형 호가 추정"""
@@ -69,9 +64,9 @@ def estimate_similar_asking_price(row, df):
 def score_complex(row, cash, loan, area_group, condition, lines, household):
     """단지 점수 계산: 사용자 조건과 데이터 일치도 기반"""
     score = 0
-    pyeong = get_pyeong(row["전용면적"])
+    pyeong = row["평형"]  # 평형 열 사용
     p_min, p_max = get_area_range(area_group)
-    if p_min <= row["전용면적"] <= p_max:
+    if p_min <= pyeong <= p_max:
         score += 1.5
     elif area_group == "상관없음":
         score += 1
@@ -95,13 +90,12 @@ def score_complex(row, cash, loan, area_group, condition, lines, household):
     return score
 
 def round_price(val, price_type, is_estimated=False):
-    """가격을 억 단위로 반올림, 호가/추정가는 ±10% 범위 포함"""
+    """가격을 억 단위로 반올림, 호가/추정가는 +10% 범위 포함"""
     if pd.isna(val) or val < 1.0:
         return "정보 없음"
-    if price_type == "동일단지 유사평형 호가 추정":
-        lower = round(val * 0.9, 2)
-        upper = round(val * 1.1, 2)
-        return f"{lower:.2f}~{upper:.2f}억"
+    if price_type in ["호가", "동일단지 유사평형 호가 추정"] or is_estimated:
+        upper = round(val * 1.1, 2)  # +10% 범위
+        return f"{round(val, 2):.2f}~{upper:.2f}억"
     return f"{round(val, 2):.2f}억"
 
 def get_condition_note(cash, loan, area_group, condition, lines, household, row):
@@ -112,10 +106,10 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
         notes.append(f"현금 {cash}억")
     if loan > 0:
         notes.append(f"대출 {loan}억")
-    actual_area = row["전용면적"]
-    area_min, area_max = get_area_range(area_group)
+    actual_pyeong = row["평형"]
+    p_min, p_max = get_area_range(area_group)
     if area_group != "상관없음":
-        if area_min <= actual_area <= area_max:
+        if p_min <= actual_pyeong <= p_max:
             notes.append(f"{area_group}")
         else:
             condition_mismatch = True
@@ -165,7 +159,7 @@ if submitted:
         st.stop()
 
     # 데이터 전처리
-    df[['단지명', '준공연도', '세대수']] = df[['단지명', '준공연도', '세대수']].fillna(method="ffill")
+    df[['단지명', '준공연도', '세대수', '건축유형', '역세권', '노선']] = df[['단지명', '준공연도', '세대수', '건축유형', '역세권', '노선']].fillna(method="ffill")
     df['실거래가'] = pd.to_numeric(df['2025.03'], errors='coerce')
     df['현재호가'] = pd.to_numeric(df['20250521호가'], errors='coerce')
     df['추정가'] = pd.to_numeric(df['2025.05_보정_추정실거래가'], errors='coerce')
@@ -173,12 +167,18 @@ if submitted:
     df['거래연도'] = df['거래일'].dt.year
     # 건축유형 표준화: 빈 값 처리
     df['건축유형'] = df.apply(lambda row: '신축' if pd.notna(row['준공연도']) and row['준공연도'] >= 2018 else row.get('건축유형', '기축'), axis=1)
+    # 동일 단지 정보 공유
+    df[['건축유형', '역세권', '노선']] = df.groupby('단지명')[['건축유형', '역세권', '노선']].fillna(method="ffill")
 
     # 필터링: 가격 1억 이상
     df = df[df['실거래가'] >= 1.0]
 
     # 점수 계산
     df["점수"] = df.apply(lambda row: score_complex(row, cash, loan, area_group, condition, lines, household), axis=1)
+
+    # 역세권 및 노선 우선순위
+    df['역세권_우선'] = df['역세권'].map({'Y': 1, 'N': 0})
+    df['노선_우선'] = df['노선'].apply(lambda x: 1 if any(line in str(x) for line in ['3', '7', '9']) else 0)
 
     # 예산 상한 필터링
     df = df[df['실거래가'] <= budget_cap].copy()
@@ -207,7 +207,7 @@ if submitted:
     df_filtered = df[df['실사용가격'] <= budget_upper].copy()
 
     # 단일 단지 중복 제거 및 상위 3개 추천
-    df_filtered = df_filtered.sort_values(by=["점수", "세대수"], ascending=[False, False])
+    df_filtered = df_filtered.sort_values(by=["점수", "역세권_우선", "노선_우선", "세대수"], ascending=[False, False, False, False])
     df_filtered = df_filtered.drop_duplicates(subset=['단지명'], keep='first')
 
     # 추천 단지 부족 시 예산 초과 단지 포함
@@ -215,7 +215,7 @@ if submitted:
     if len(top3) < 3:
         remaining_slots = 3 - len(top3)
         extra_df = df[(df['실사용가격'] > budget_upper) & (df['실사용가격'] <= budget_cap)]
-        extra_df = extra_df.sort_values(by=["점수", "세대수"], ascending=[False, False])
+        extra_df = extra_df.sort_values(by=["점수", "역세권_우선", "노선_우선", "세대수"], ascending=[False, False, False, False])
         extra_df = extra_df.drop_duplicates(subset=['단지명'], keep='first')
         extra_df = extra_df[~extra_df['단지명'].isin(top3['단지명'])]
         top3 = pd.concat([top3, extra_df.head(remaining_slots)])
@@ -240,8 +240,8 @@ if submitted:
         단지명 = row['단지명']
         준공 = int(row['준공연도']) if pd.notna(row['준공연도']) else "미상"
         세대 = int(row['세대수']) if pd.notna(row['세대수']) else "미상"
+        평형 = row['평형']  # 평형 열 사용
         면적 = row['전용면적']
-        평형 = get_pyeong(면적)
         실거래 = round_price(row['실사용가격'], row['가격출처_실사용'], is_estimated=(row['가격출처_실사용'] == '동일단지 유사평형 호가 추정'))
         거래일 = row['거래일'].strftime("%Y.%m.%d") if pd.notna(row['거래일']) and row['거래연도'] >= 2024 else "최근 거래 없음"
         호가 = round_price(row['현재호가'], row['가격출처'], is_estimated=(row['가격출처'] == '동일단지 유사평형 호가 추정'))
@@ -250,7 +250,7 @@ if submitted:
         조건설명, _ = get_condition_note(cash, loan, area_group, condition, lines, household, row)
         추천이유 = classify_recommendation(row, budget_upper)
 
-        # 가격 출력 형식 수정
+        # 가격 출력 형식
         실거래출력 = f"가격: {실거래} (거래일: {거래일})"
         if 출처 == "호가":
             호가출력 = f"현재 호가: {호가}"
