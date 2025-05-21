@@ -62,15 +62,29 @@ def round_price(val):
 def get_pyeong(area):
     return str(int(round(area / 3.3))) + "평"
 
-def get_condition_note(cash, loan, area_group, condition, lines, household):
+def get_condition_note(cash, loan, area_group, condition, lines, household, row):
     notes = []
     if cash > 0: notes.append(f"현금 {cash}억")
     if loan > 0: notes.append(f"대출 {loan}억")
-    if area_group != "상관없음": notes.append(f"{area_group}")
-    if condition != "상관없음": notes.append(f"{condition}")
-    if "상관없음" not in lines: notes.append(f"{', '.join(lines)} 노선")
-    if household != "상관없음": notes.append(f"{household}")
-    return "입력하신 조건(" + ", ".join(notes) + ")에 따라 우선순위를 적용해 추천했습니다." if notes else "예산 조건을 중심으로 선별한 결과입니다."
+
+    # 정확한 면적 그룹 일치 여부 판단
+    actual_area = row["전용면적"]
+    actual_pyeong = actual_area / 3.3
+    area_min, area_max = get_area_range(area_group)
+    if area_group != "상관없음" and (area_min <= actual_area <= area_max):
+        notes.append(f"{area_group}")
+
+    if condition != "상관없음" and condition in str(row.get("건축유형", "")):
+        notes.append(f"{condition}")
+    if "상관없음" not in lines and row['역세권'] == "Y":
+        notes.append(f"{', '.join(lines)} 노선")
+    if household != "상관없음":
+        if household == "대단지" and row['세대수'] >= 1000:
+            notes.append("대단지")
+        elif household == "소단지" and row['세대수'] < 1000:
+            notes.append("소단지")
+
+    return "입력하신 조건(" + ", ".join(notes) + ")에 따라 우선순위를 적용해 추천했습니다." if notes else "입력하신 조건을 기반으로 추천했습니다."
 
 def classify_recommendation(row):
     if row['점수'] >= 4 and row['실사용가격'] <= budget_upper:
