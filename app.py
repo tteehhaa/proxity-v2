@@ -163,8 +163,6 @@ if submitted:
     else:
         top3 = pd.DataFrame()  # 빈 DataFrame으로 초기화
 
-top3['추천이유'] = top3.apply(classify_recommendation, axis=1)
-
   # 조건 불일치 안내 메시지 출력
 condition_mismatch = False
 
