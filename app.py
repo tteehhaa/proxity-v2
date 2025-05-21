@@ -4,7 +4,7 @@ import math
 import os
 
 # Streamlit 페이지 설정
-st.set_page_config(page_title="잠원동 아파트 단지 추천기 (2025년 5월 v0.1)", layout="centered")
+st.set_page_config(page_title="아파트 단지 추천 프로그램 (2025년 5월 잠원동생집사v0.1)", layout="centered")
 
 # 앱 제목 및 설명
 st.markdown("""
@@ -20,18 +20,18 @@ with st.form("user_input_form"):
     st.markdown("### 조건을 입력해주세요")
     col1, col2 = st.columns(2)
     with col1:
-        cash = st.number_input("현금 (예: 16.0억)", min_value=0.0, max_value=100.0, value=16.0, step=0.5)
-        loan = st.number_input("주택담보대출 가능 금액 (예: 12.0억)", min_value=0.0, max_value=30.0, value=24.0, step=0.5)
+        cash = st.number_input("현금 (예: 16.0억)", min_value=0.0, max_value=100.0, value=3.0, step=0.5)
+        loan = st.number_input("주택담보대출 가능 금액 (예: 12.0억)", min_value=0.0, max_value=30.0, value=3.0, step=0.5)
         area_group = st.selectbox("원하는 평형대", ["상관없음", "10평 이하", "20평대", "30평대", "40평 이상"])
         condition = st.selectbox("건물 컨디션", ["상관없음", "신축", "기축", "리모델링", "재건축"])
     with col2:
         lines = st.multiselect("선호 지하철 노선", ["상관없음", "3호선", "7호선", "9호선", "신분당선"])
-        household = st.selectbox("단지 규모", ["상관없음", "대단지", "소단지"])
+        household = st.selectbox("단지 규모", ["상관없음", "대단지", "소단지 (300세대 이상)", "소단지 (300세대 이하)"])
 
     # 예산 계산
     total_budget = cash + loan
     budget_upper = total_budget * 1.1  # +10% 추가 예산
-    budget_cap = total_budget * 1.3   # 예산 초과 단지 포함용
+    budget_cap = total_budget * 1.3   # 확장 예산
 
     submitted = st.form_submit_button("지금 추천 받기")
 
@@ -48,7 +48,7 @@ def estimate_similar_asking_price(row, df):
     """동일 단지 내 유사 평형 호가 추정"""
     if pd.isna(row['현재호가']):
         complex_name = row['단지명']
-        target_area = math.floor(row['전용면적'])  # 전용면적 소수점 이하 버림
+        target_area = math.floor(row['전용면적'])
         similar_units = df[(df['단지명'] == complex_name) & df['현재호가'].notna()]
         if not similar_units.empty:
             similar_units['면적차이'] = abs(similar_units['전용면적'].apply(math.floor) - target_area)
@@ -78,9 +78,12 @@ def score_complex(row, cash, loan, area_group, condition, lines, household):
             score += 1.5
     else:
         score += 1
-    if household == "대단지" and row['세대수'] >= 1000:
+    세대수 = row['세대수'] if pd.notna(row['세대수']) else 0
+    if household == "대단지" and 세대수 >= 1000:
         score += 1
-    elif household == "소단지" and row['세대수'] < 1000:
+    elif household == "소단지 (300세대 이상)" and 300 <= 세대수 < 1000:
+        score += 1
+    elif household == "소단지 (300세대 이하)" and 세대수 < 300:
         score += 1
     elif household == "상관없음":
         score += 1
@@ -102,10 +105,13 @@ def score_correlated_factors(row, area_group, condition, lines, household):
     if "상관없음" not in lines:
         if row['역세권'] == "Y" and any(line in str(row.get("노선", "")) for line in lines):
             score += 0.5
+    세대수 = row['세대수'] if pd.notna(row['세대수']) else 0
     if household != "상관없음":
-        if household == "대단지" and row['세대수'] >= 1000:
+        if household == "대단지" and 세대수 >= 1000:
             score += 0.5
-        elif household == "소단지" and row['세대수'] < 1000:
+        elif household == "소단지 (300세대 이상)" and 300 <= 세대수 < 1000:
+            score += 0.5
+        elif household == "소단지 (300세대 이하)" and 세대수 < 300:
             score += 0.5
     return score
 
@@ -149,10 +155,13 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
         else:
             condition_mismatch = True
     if household != "상관없음":
-        if household == "대단지" and row['세대수'] >= 1000:
+        세대수 = row['세대수'] if pd.notna(row['세대수']) else 0
+        if household == "대단지" and 세대수 >= 1000:
             notes.append("대단지")
-        elif household == "소단지" and row['세대수'] < 1000:
-            notes.append("소단지")
+        elif household == "소단지 (300세대 이상)" and 300 <= 세대수 < 1000:
+            notes.append("소단지 (300세대 이상)")
+        elif household == "소단지 (300세대 이하)" and 세대수 < 300:
+            notes.append("소단지 (300세대 이하)")
         else:
             condition_mismatch = True
     condition_text = "입력하신 조건(" + ", ".join(notes) + ")에 따라 추천된 단지입니다." if notes else "입력하신 조건을 기반으로 추천된 단지입니다."
@@ -220,34 +229,36 @@ if submitted:
     df.loc[mask_추정, '실사용가격'] = df['추정가']
     df.loc[mask_추정, '가격출처_실사용'] = '추정'
 
-    # 현재 호가 기준 필터링
+    # 현재 호가/추정가 상한 설정
     df['호가_상한'] = df['현재호가'] * 1.1
     df['추정가_상한'] = df['추정가'] * 1.1
-    df = df[
-        (df['호가_상한'].notna() & (df['호가_상한'] <= budget_upper)) | 
-        (df['호가_상한'].isna() & df['추정가_상한'].notna() & (df['추정가_상한'] <= budget_upper))
+
+    # 필터링: 예산 상한 및 확장 예산 모두 고려
+    df_budget_filtered = df[
+        (df['호가_상한'].notna() & (df['호가_상한'] <= budget_cap)) | 
+        (df['호가_상한'].isna() & df['추정가_상한'].notna() & (df['추정가_상한'] <= budget_cap))
     ].copy()
 
     # 오래된 거래 제외
-    df = df[(df['거래연도'].isna()) | (df['거래연도'] >= 2024)]
+    df_budget_filtered = df_budget_filtered[(df_budget_filtered['거래연도'].isna()) | (df_budget_filtered['거래연도'] >= 2024)]
 
-    # 예산 내 단지 필터링
-    df_filtered = df[df['실사용가격'] <= budget_upper].copy()
+    # 예산 내 단지 필터링 (budget_upper 이내)
+    df_filtered = df_budget_filtered[df_budget_filtered['실사용가격'] <= budget_upper].copy()
     df_filtered = df_filtered.sort_values(by=["점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"], ascending=[False, False, False, False, False])
     df_filtered = df_filtered.drop_duplicates(subset=['단지명'], keep='first')
     top3 = df_filtered.head(3)
 
     # 단지 2개일 경우 예산 확장
     if len(top3) == 2:
-        df_extended = df[df['실사용가격'] <= budget_cap].copy()
+        df_extended = df_budget_filtered[df_budget_filtered['실사용가격'] <= budget_cap].copy()
         df_extended = df_extended.sort_values(by=["점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"], ascending=[False, False, False, False, False])
         df_extended = df_extended.drop_duplicates(subset=['단지명'], keep='first')
         top3 = df_extended.head(3)
         if len(top3) < 3:
             st.markdown(f"""
-            **안내**: 현재 잠원동 아파트의 호가가 높아 예산 상한(%.2f억원)을 초과한 단지를 포함해 3개를 추천드립니다.  
-            예산 상한(%.2f억원)을 약간 초과한 단지는 참고용으로만 활용하세요.
-            """ % (budget_upper, budget_cap))
+            **안내**: 현재 잠원동 아파트의 호가가 높아 예산 상한(%.2f억원)을 초과한 단지를 포함해도 3개 단지를 찾지 못했습니다.  
+            현재 데이터에서 %.2f억원 이하 단지가 부족합니다. 데이터를 확인하거나 예산을 추가로 확장(예: %.2f억원)해 보세요.
+            """ % (budget_upper, budget_cap, budget_cap * 1.2))
 
     # 추천 단지 부족 시 메시지
     if len(top3) == 0:
@@ -279,7 +290,7 @@ if submitted:
         **안내**: 입력하신 조건(평형, 컨디션, 노선, 세대수)에 정확히 부합하는 단지는 없어 일부 조건을 완화해 추천드립니다.
         """)
 
-    # 추천 결과 출력 (표 형식)
+    # 추천 결과 출력 (텍스트 형식)
     st.markdown("### 추천 단지")
     for idx, row in top3.iterrows():
         단지명 = row['단지명']
@@ -304,16 +315,26 @@ if submitted:
         else:
             호가출력 = "현재 매물은 없으나, 이전 실거래에 따라 추천되었으며, 매물이 나올 경우 이전 실거래와 현재 매물 가격은 다를 수 있음"
 
-        # 표 형식으로 출력
-        data = {
-            "항목": ["단지명", "평형", "전용면적", "준공연도", "세대수", "실거래 가격", "현재 호가/추정가", "추천 이유"],
-            "내용": [단지명, f"{평형}평", f"{면적}㎡", 준공, 세대, 실거래출력, 호가출력, f"{조건설명} {추천이유}"]
-        }
-        st.table(pd.DataFrame(data))
+        # 텍스트 형식으로 출력
+        st.markdown(f"""
+**단지명**: {단지명}  
+**기본 정보**:  
+- 평형: {평형}평  
+- 전용면적: {면적}㎡  
+- 준공연도: {준공}  
+- 세대수: {세대}  
+
+**가격 정보**:  
+- 실거래 가격: {실거래출력}  
+- 현재 호가/추정가: {호가출력}  
+
+**추천 이유**:  
+{조건설명} {추천이유}  
+        """)
 
     st.markdown("---")
     st.markdown("""
-    ※ 위 추천은 사용자의 입력 조건과 2025.03 기준가를 종합하여 제안드린 결과입니다.  
+    ※ 위 추천은 사용자의 입력 조건과 2025.05 기준가를 종합하여 제안드린 결과입니다.  
     ※ 본 추천 결과는 동생의 내집마련을 위한 정보를 제공 목적으로 이루어지는 테스트이며, 투자 권유 또는 자문이 아닙니다.  
     ※ 실제 매수 결정 시에는 본인의 판단과 책임 하에 신중히 검토해주시기 바랍니다.
     """)
