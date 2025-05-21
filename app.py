@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 
@@ -53,15 +52,20 @@ def score_complex(row, area_group, condition, lines, household):
     elif household == "상관없음": score += 1
     return score
 
-def round_price(val): return f"{round(val, 2):.2f}억" if not pd.isna(val) else "정보 없음"
-def get_pyeong(area): return str(int(round(area / 3.3))) + "평"
+def round_price(val): return f"{round(val, 2):.2f}억" if not pd.isna(val) and val >= 1.0 else "정보 없음"
 
 if submitted:
     df = pd.read_csv("data/jw_v0.13_streamlit_ready.csv")
     df[['단지명', '준공연도', '세대수']] = df[['단지명', '준공연도', '세대수']].fillna(method="ffill")
+
     df['현재호가'] = pd.to_numeric(df['20250521호가'], errors='coerce')
     df['2025.05_보정_추정실거래가'] = pd.to_numeric(df['2025.05_보정_추정실거래가'], errors='coerce')
+
+    # 실거래가가 1억 이상인 경우만 필터링
+    df = df[df['2025.05_보정_추정실거래가'] >= 1.0]
+
     df["점수"] = df.apply(lambda row: score_complex(row, area_group, condition, lines, household), axis=1)
+
     df = df[df['2025.05_보정_추정실거래가'] <= budget_cap].copy()
     df['실사용가격'] = df['현재호가']
     df['가격출처'] = "호가"
@@ -78,15 +82,16 @@ if submitted:
         준공 = int(row['준공연도']) if pd.notna(row['준공연도']) else "미상"
         세대 = int(row['세대수']) if pd.notna(row['세대수']) else "미상"
         면적 = row['전용면적']
-        평형 = get_pyeong(면적)
+        평형 = row.get("평형", get_pyeong(면적))  # 평형 컬럼 우선 사용
         실거래 = round_price(row['2025.05_보정_추정실거래가'])
         출처 = row['가격출처']
         유형 = row.get("건축유형", "미상")
         matched = condition == "상관없음" or condition in 유형
         note = "입력하신 조건을 바탕으로 추천드리는 단지입니다." if matched else f'"{condition}" 조건에는 완전히 부합하지 않지만 유사 조건을 바탕으로 추천드립니다.'
         price_note = "현재 해당 평형 매물은 없으나, 예산 범위 내 매물로 추정됩니다." if 출처 == "추정" else ""
+
         st.markdown(f"""#### {단지명}
-- 전용면적: {round(면적, 1)}m2 ({평형})
+- 평형: {평형} (전용면적: {round(면적, 1)}m2)
 - 준공연도: {준공} / 세대수: {세대}
 - 실거래가(2025.05 기준): {실거래}
 - {price_note}
