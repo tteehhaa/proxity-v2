@@ -48,6 +48,23 @@ def get_pyeong(area):
     """전용면적(㎡)을 평으로 변환"""
     return round(area / 3.3, 1)
 
+def estimate_similar_asking_price(row, df):
+    """동일 단지 내 유사 평형 호가 추정"""
+    if pd.isna(row['현재호가']):
+        complex_name = row['단지명']
+        target_area = row['전용면적']
+        similar_units = df[(df['단지명'] == complex_name) & df['현재호가'].notna()]
+        if not similar_units.empty:
+            # 가장 가까운 면적의 호가 선택 (±5㎡)
+            similar_units['면적차이'] = abs(similar_units['전용면적'] - target_area)
+            closest_unit = similar_units.loc[similar_units['면적차이'].idxmin()]
+            closest_area = closest_unit['전용면적']
+            closest_price = closest_unit['현재호가']
+            # 면적 비율로 환산, 프리미엄 계수(1.05) 적용
+            estimated_price = (closest_price / closest_area) * target_area * 1.05
+            return estimated_price, "동일단지 유사평형 호가 추정"
+    return row['현재호가'], row.get('가격출처', '실거래가')
+
 def score_complex(row, cash, loan, area_group, condition, lines, household):
     """단지 점수 계산: 사용자 조건과 데이터 일치도 기반"""
     score = 0
@@ -80,33 +97,45 @@ def round_price(val):
 def get_condition_note(cash, loan, area_group, condition, lines, household, row):
     """사용자 조건과 단지 데이터 간 일치성 설명"""
     notes = []
+    condition_mismatch = False
     if cash > 0:
         notes.append(f"현금 {cash}억")
     if loan > 0:
         notes.append(f"대출 {loan}억")
     actual_area = row["전용면적"]
     area_min, area_max = get_area_range(area_group)
-    if area_group != "상관없음" and area_min <= actual_area <= area_max:
-        notes.append(f"{area_group}")
-    if condition != "상관없음" and condition in str(row.get("건축유형", "")):
-        notes.append(f"{condition}")
-    if "상관없음" not in lines and row['역세권'] == "Y" and any(line in str(row.get("노선", "")) for line in lines):
-        notes.append(f"{', '.join(lines)} 노선")
+    if area_group != "상관없음":
+        if area_min <= actual_area <= area_max:
+            notes.append(f"{area_group}")
+        else:
+            condition_mismatch = True
+    if condition != "상관없음":
+        if condition in str(row.get("건축유형", "")):
+            notes.append(f"{condition}")
+        else:
+            condition_mismatch = True
+    if "상관없음" not in lines:
+        if row['역세권'] == "Y" and any(line in str(row.get("노선", "")) for line in lines):
+            notes.append(f"{', '.join(lines)} 노선")
+        else:
+            condition_mismatch = True
     if household != "상관없음":
         if household == "대단지" and row['세대수'] >= 1000:
             notes.append("대단지")
         elif household == "소단지" and row['세대수'] < 1000:
             notes.append("소단지")
-    return "입력하신 조건(" + ", ".join(notes) + ")에 따라 우선순위를 적용해 추천했습니다." if notes else "입력하신 조건을 기반으로 추천했습니다."
+        else:
+            condition_mismatch = True
+    return "입력하신 조건(" + ", ".join(notes) + ")에 따라 우선순위를 적용해 추천했습니다." if notes else "입력하신 조건을 기반으로 추천했습니다.", condition_mismatch
 
 def classify_recommendation(row, budget_upper):
     """추천 단지 분류"""
-    if row['점수'] >= 4 and row['실사용가격'] <= budget_upper:
+    if row['실사용가격'] > budget_upper:
+        return "예산 초과 단지 포함: 조건을 충족해 추가로 추천되었습니다."
+    elif row['점수'] >= 4 and row['실사용가격'] <= budget_upper:
         return "예산과 조건을 모두 충족한 단지입니다."
-    elif row['실사용가격'] <= budget_upper:
-        return "조건 일부가 부합하지 않지만, 예산에 맞춰 추천된 단지입니다."
     else:
-        return "예산과 부합하지 않지만, 일부 조건을 충족하여 추천된 단지입니다."
+        return "조건 일부가 부합하지 않지만, 예산에 맞춰 추천된 단지입니다."
 
 # --- 데이터 처리 및 출력 ---
 if submitted:
@@ -139,12 +168,15 @@ if submitted:
     # 예산 상한 필터링
     df = df[df['실거래가'] <= budget_cap].copy()
 
+    # 동일 단지 유사 평형 호가 추정
+    df[['현재호가', '가격출처']] = df.apply(lambda row: pd.Series(estimate_similar_asking_price(row, df)), axis=1)
+
     # 실사용가격 설정: 실거래가 > 호가 > 추정가 우선순위
     df['실사용가격'] = df['실거래가']
-    df['가격출처'] = '실거래가'
+    df['가격출처'] = df['가격출처'].fillna('실거래가')
     mask_호가 = df['실사용가격'].isna() & df['현재호가'].notna()
     df.loc[mask_호가, '실사용가격'] = df['현재호가']
-    df.loc[mask_호가, '가격출처'] = '호가'
+    df.loc[mask_호가, '가격출처'] = df['가격출처']
     mask_추정 = df['실사용가격'].isna() & df['추정가'].notna()
     df.loc[mask_추정, '실사용가격'] = df['추정가']
     df.loc[mask_추정, '가격출처'] = '추정'
@@ -156,9 +188,36 @@ if submitted:
     # 오래된 거래 제외 (2024년 이후)
     df = df[(df['거래연도'].isna()) | (df['거래연도'] >= 2024)]
 
-    # 예산 내 단지 필터링 및 상위 3개 추천
+    # 예산 내 단지 필터링
     df_filtered = df[df['실사용가격'] <= budget_upper].copy()
-    top3 = df_filtered.sort_values(by=["점수", "세대수"], ascending=[False, False]).head(3)
+
+    # 단일 단지 중복 제거 및 상위 3개 추천
+    df_filtered = df_filtered.sort_values(by=["점수", "세대수"], ascending=[False, False])
+    df_filtered = df_filtered.drop_duplicates(subset=['단지명'], keep='first')
+
+    # 추천 단지 부족 시 예산 초과 단지 포함
+    top3 = df_filtered.head(3)
+    if len(top3) < 3:
+        remaining_slots = 3 - len(top3)
+        extra_df = df[(df['실사용가격'] > budget_upper) & (df['실사용가격'] <= budget_cap)]
+        extra_df = extra_df.sort_values(by=["점수", "세대수"], ascending=[False, False])
+        extra_df = extra_df.drop_duplicates(subset=['단지명'], keep='first')
+        extra_df = extra_df[~extra_df['단지명'].isin(top3['단지명'])]
+        top3 = pd.concat([top3, extra_df.head(remaining_slots)])
+
+    # 조건 불일치 확인
+    condition_mismatch = False
+    for _, row in top3.iterrows():
+        _, mismatch = get_condition_note(cash, loan, area_group, condition, lines, household, row)
+        if mismatch:
+            condition_mismatch = True
+            break
+
+    # 조건 불일치 메시지 출력
+    if condition_mismatch:
+        st.markdown("""
+        **안내**: 입력하신 조건(평형, 컨디션, 노선, 세대수)에 정확히 부합하는 단지는 없어 일부 조건을 완화해 추천드립니다.
+        """)
 
     # 추천 결과 출력
     st.markdown("### 추천 단지")
@@ -171,7 +230,7 @@ if submitted:
         실거래 = round_price(row['실사용가격'])
         거래일 = row['거래일'].strftime("%Y.%m.%d") if pd.notna(row['거래일']) and row['거래연도'] >= 2024 else "최근 거래 없음"
         출처 = row['가격출처']
-        조건설명 = get_condition_note(cash, loan, area_group, condition, lines, household, row)
+        조건설명, _ = get_condition_note(cash, loan, area_group, condition, lines, household, row)
         추천이유 = classify_recommendation(row, budget_upper)
 
         st.markdown(f"""#### {단지명}
