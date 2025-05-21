@@ -152,7 +152,7 @@ if submitted:
         거래일 = row['거래일'] if pd.notna(row['거래일']) and str(row['거래일']).startswith("2024") or str(row['거래일']).startswith("2025") else "2024년 이후 거래 없음"
         호가 = round_price(row['현재호가'])
         출처 = row['가격출처']
-        조건설명 = get_condition_note(cash, loan, area_group, condition, lines, household)
+        조건설명 = get_condition_note(cash, loan, area_group, condition, lines, household, row)
         추천사유 = row['추천이유']
 
         st.markdown(f"""#### {단지명}
