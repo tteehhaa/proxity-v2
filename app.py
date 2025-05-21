@@ -23,8 +23,8 @@ with st.form("user_input_form"):
         household = st.selectbox("단지 규모", ["대단지", "소단지", "상관없음"])
 
     total_budget = cash + loan
-    flexible_budget = min(1.0, total_budget * 0.1)
-    budget_upper = total_budget + flexible_budget
+    budget_flex = min(2.0, total_budget * 0.2)
+    budget_upper = total_budget + budget_flex
     budget_cap = total_budget * 1.3
     budget_half = total_budget * 0.5
     submitted = st.form_submit_button("지금 추천 받기")
@@ -52,39 +52,57 @@ def score_complex(row, area_group, condition, lines, household):
     elif household == "상관없음": score += 1
     return score
 
-def round_price(val): return f"{round(val, 2):.2f}억" if not pd.isna(val) and val >= 1.0 else "정보 없음"
-def get_pyeong(area): return str(int(round(area / 3.3))) + "평"
+def round_price(val):
+    return f"{round(val, 2):.2f}억" if pd.notna(val) and val >= 1.0 else "정보 없음"
 
-def get_condition_note(row, area_group, condition, lines, household):
-    notes = []
-    if area_group != "상관없음": notes.append(f"{area_group} 평형대")
-    if condition != "상관없음": notes.append(f"{condition} 컨디션")
-    if "상관없음" not in lines: notes.append(f"{', '.join(lines)} 노선")
-    if household != "상관없음": notes.append(f"{household} 단지")
-    return "입력하신 조건(" + ", ".join(notes) + ")에 부합하여 추천드립니다." if notes else "입력하신 조건에 기반하여 추천드립니다."
+def get_pyeong(area):
+    return str(int(round(area / 3.3))) + "평"
+
+def get_condition_note(area_group, condition, lines, household, cash, loan):
+    parts = []
+    if cash > 0 or loan > 0:
+        parts.append(f"총 예산 {cash + loan:.1f}억")
+    if area_group != "상관없음":
+        parts.append(area_group + " 평형대")
+    if condition != "상관없음":
+        parts.append(condition)
+    if "상관없음" not in lines:
+        parts.append("지하철 " + ", ".join(lines))
+    if household != "상관없음":
+        parts.append(household)
+    return "입력 조건(" + ", ".join(parts) + ")에 기반해 선별된 단지입니다."
 
 if submitted:
     df = pd.read_csv("data/jw_v0.13_streamlit_ready.csv")
     df[['단지명', '준공연도', '세대수']] = df[['단지명', '준공연도', '세대수']].fillna(method="ffill")
-
     df['실거래가'] = pd.to_numeric(df['2025.03'], errors='coerce')
     df['현재호가'] = pd.to_numeric(df['20250521호가'], errors='coerce')
-    df['2025.05_보정_추정실거래가'] = pd.to_numeric(df['2025.05_보정_추정실거래가'], errors='coerce')
+    df['추정가'] = pd.to_numeric(df['2025.05_보정_추정실거래가'], errors='coerce')
+    df['거래일'] = pd.to_datetime(df['거래일'], errors='coerce')
+    df['거래연도'] = df['거래일'].dt.year
 
-    df = df[df['2025.05_보정_추정실거래가'] >= 1.0]
+    df = df[df['추정가'] >= 1.0]
     df["점수"] = df.apply(lambda row: score_complex(row, area_group, condition, lines, household), axis=1)
 
-    # 추정가 기반 필터링 (노출 X)
-    df = df[df['2025.05_보정_추정실거래가'] <= budget_cap].copy()
+    df = df[df['추정가'] <= budget_cap].copy()
 
-    # 실사용가격 = 실거래가 > 호가 > 추정가 순서 (단, 추정가는 사용자 미노출)
     df['실사용가격'] = df['실거래가']
     df['가격출처'] = '실거래가'
-    mask = df['실사용가격'].isna() & df['현재호가'].notna()
-    df.loc[mask, '실사용가격'] = df['현재호가']
-    df.loc[mask, '가격출처'] = '호가'
+    mask_호가 = df['실사용가격'].isna() & df['현재호가'].notna()
+    df.loc[mask_호가, '실사용가격'] = df['현재호가']
+    df.loc[mask_호가, '가격출처'] = '호가'
 
-    df = df[~((df['실사용가격'].isna()) & (df['2025.05_보정_추정실거래가'] > budget_half))]
+    mask_추정 = df['실사용가격'].isna() & df['추정가'].notna()
+    df.loc[mask_추정, '실사용가격'] = df['추정가']
+    df.loc[mask_추정, '가격출처'] = '추정'
+
+    # 추정가 기반인 경우 예산의 ±20% (최대 2억) 이내인지 판단
+    df['추정가허용상한'] = df['추정가'] * 1.1
+    df = df[~((df['가격출처'] == '추정') & ((df['추정가허용상한'] > budget_upper)))]
+
+    # 너무 오래된 실거래는 제외
+    df = df[(df['거래연도'].isna()) | (df['거래연도'] >= 2024)]
+
     df_filtered = df[df['실사용가격'] <= budget_upper].copy()
     top3 = df_filtered.sort_values(by=["점수", "세대수"], ascending=[False, False]).head(3)
 
@@ -95,20 +113,20 @@ if submitted:
         세대 = int(row['세대수']) if pd.notna(row['세대수']) else "미상"
         면적 = row['전용면적']
         평형 = row.get("평형", get_pyeong(면적))
-        실거래가 = round_price(row['실거래가'])
-        거래일 = row['거래일'] if pd.notna(row['거래일']) else "정보 없음"
+        실거래 = round_price(row['실거래가'])
+        거래일 = row['거래일'].strftime("%Y.%m.%d") if pd.notna(row['거래일']) and row['거래연도'] >= 2024 else "최근 거래 없음"
         호가 = round_price(row['현재호가'])
         출처 = row['가격출처']
-        조건설명 = get_condition_note(row, area_group, condition, lines, household)
+        조건설명 = get_condition_note(area_group, condition, lines, household, cash, loan)
 
         st.markdown(f"""#### {단지명}
 - 평형: {평형} (전용면적: {round(면적, 1)}m²)
 - 준공연도: {준공} / 세대수: {세대}
-- 최신 실거래가: {실거래가} (거래일: {거래일})
+- 마지막 실거래가: {실거래} (거래일: {거래일})
 - {f"현재 호가: {호가}" if 출처 == "호가" else "현재 매물은 없지만 관심 둘 만한 단지입니다."}
 
 조건 평가: {조건설명}
 """)
 
     st.markdown("---")
-    st.markdown("※ 위 추천은 입력하신 기준을 종합적으로 고려하여 선별된 단지입니다.")
+    st.markdown("※ 위 추천은 입력하신 예산 및 조건을 바탕으로, 실거래가·호가·추정가 등 종합적 기준을 통해 선별된 단지입니다.")
