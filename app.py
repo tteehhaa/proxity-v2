@@ -155,14 +155,14 @@ if submitted:
         df_filtered = df_filtered.drop_duplicates(subset=['단지명', '전용면적'])
 
     # 같은 단지 중복 제거, 세대수 기준 정렬
-    top3 = df_filtered.sort_values(by=["세대수", "점수"], ascending=[False, False])\
+        top3 = df_filtered.sort_values(by=["세대수", "점수"], ascending=[False, False])\
                       .drop_duplicates(subset=["단지명"])\
                       .head(3)
 
-    top3['추천이유'] = top3.apply(classify_recommendation, axis=1)
+        top3['추천이유'] = top3.apply(classify_recommendation, axis=1)
 
   # 조건 불일치 안내 메시지 출력
-condition_mismatch = False
+        condition_mismatch = False
 
 for _, row in top3.iterrows():
     condition_mismatch = False  # 초기화
