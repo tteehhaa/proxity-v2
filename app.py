@@ -22,7 +22,7 @@ with st.form("user_input_form"):
         condition = st.selectbox("건물 컨디션", ["상관없음", "신축", "기축", "리모델링", "재건축"])
     with col2:
         lines = st.multiselect("선호 지하철 노선", ["상관없음", "3호선", "7호선", "9호선", "신분당선"])
-        household = st.selectbox("단지 규모", ["대단지", "소단지", "상관없음"])
+        household = st.selectbox("단지 규모", ["상관없음", "대단지", "소단지"])
 
     total_budget = cash + loan
     flexible_budget = min(2.0, total_budget * 0.2)
@@ -114,26 +114,28 @@ if submitted:
     df['2025.05_보정_추정실거래가'] = pd.to_numeric(df['2025.05_보정_추정실거래가'], errors='coerce')
     df["점수"] = df.apply(lambda row: score_complex(row, area_group, condition, lines, household), axis=1)
 
-    # 실사용가격 초기화
-df['실사용가격'] = df['실거래가']
-df['가격출처'] = '실거래가'
+# 실사용가격 초기화
+    df['실사용가격'] = df['실거래가']
+    df['가격출처'] = '실거래가'
 
 # 실거래가 없음 + 호가 존재 → 호가로 대체
-mask_ho = df['실사용가격'].isna() & df['현재호가'].notna()
-df.loc[mask_ho, '실사용가격'] = df['현재호가']
-df.loc[mask_ho, '가격출처'] = '호가'
+    mask_ho = df['실사용가격'].isna() & df['현재호가'].notna()
+    df.loc[mask_ho, '실사용가격'] = df['현재호가']
+    df.loc[mask_ho, '가격출처'] = '호가'
 
-# 실거래가, 호가 모두 없음 + 거래일이 2024년 이후가 아님 → 추정가로 대체
-mask_est = (
-    df['실사용가격'].isna() &
-    df['2025.05_보정_추정실거래가'].notna() &
-    ~(df['거래일'].astype(str).str.startswith("2024")) &
-    ~(df['거래일'].astype(str).str.startswith("2025"))
-)
-df.loc[mask_est, '실사용가격'] = df['2025.05_보정_추정실거래가']
-df.loc[mask_est, '가격출처'] = '추정'
+# 실거래가, 호가 모두 없음 + 거래일이 2024/2025년 아님 → 추정가로 대체
+    mask_est = (
+        df['실사용가격'].isna() &
+        df['2025.05_보정_추정실거래가'].notna() &
+        ~(df['거래일'].astype(str).str.startswith("2024")) &
+        ~(df['거래일'].astype(str).str.startswith("2025"))
+    )
+    df.loc[mask_est, '실사용가격'] = df['2025.05_보정_추정실거래가']
+    df.loc[mask_est, '가격출처'] = '추정'
 
+# 추정가도 포함한 예산 상한 필터링
     df = df[df['2025.05_보정_추정실거래가'] <= budget_cap]
+
 
     # 추정가 +10%가 예산 내인 경우 추정가 사용
     mask_est = df['실사용가격'].isna() & df['2025.05_보정_추정실거래가'].notna()
