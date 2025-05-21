@@ -250,7 +250,7 @@ if submitted:
         조건설명, _ = get_condition_note(cash, loan, area_group, condition, lines, household, row)
         추천이유 = classify_recommendation(row, budget_upper)
 
-        # 가격 출력 형식
+        # 가격 출력 형식 수정: 별도의 줄로 분리
         실거래출력 = f"가격: {실거래} (거래일: {거래일})"
         if 출처 == "호가":
             호가출력 = f"현재 호가: {호가}"
@@ -258,12 +258,12 @@ if submitted:
             호가출력 = f"현재 호가: {호가}로 추정 (전용면적: {호가전용면적}㎡)"
         else:
             호가출력 = "현재 호가: 정보 없음"
-        가격출력 = f"{실거래출력} | {호가출력}"
 
         st.markdown(f"""#### {단지명}
 - 평형: {평형}평 (전용면적: {round(면적, 1)}㎡)
 - 준공연도: {준공} / 세대수: {세대}
-- {가격출력}
+- {실거래출력}
+- {호가출력}
 - 조건 평가: {조건설명}
 - 추천 이유: {추천이유}
 """)
