@@ -166,15 +166,16 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
     condition_text = "입력하신 조건(" + ", ".join(notes) + ")에 따라 추천된 단지입니다." if notes else "입력하신 조건을 기반으로 추천된 단지입니다."
     return condition_text, condition_mismatch
 
-def classify_recommendation(row, budget_upper):
-    """추천 이유 분류"""
-    if row['실사용가격'] > budget_upper:
-        additional_budget = round(row['실사용가격'] - budget_upper, 2)
-        return f"입력하신 예산을 약간 초과합니다. 약 {additional_budget}억의 추가 예산이 필요합니다."
-    elif row['점수'] >= 4 and row['실사용가격'] <= budget_upper:
-        return "예산과 조건을 모두 충족한 단지입니다."
+def classify_recommendation(row, budget_upper, total_budget):
+    """추천 이유 분류: 예산 범위 및 10% 조건 반영"""
+    budget_ten_percent = total_budget * 0.1  # 예산의 10%
+    if row['실사용가격'] <= total_budget:
+        return "입력하신 예산 범위 내에 속하는 단지입니다."
+    elif row['실사용가격'] <= budget_upper:
+        return "입력하신 예산의 10% 이내에 속하는 단지입니다."
     else:
-        return "조건 일부가 부합하지 않지만, 예산에 맞춰 추천된 단지입니다."
+        additional_budget = round(row['실사용가격'] - budget_upper, 2)
+        return f"입력하신 예산을 초과하나, 조건에 부합해 추천드립니다. 약 {additional_budget}억의 추가 예산이 필요합니다."
 
 # --- 데이터 처리 및 출력 ---
 if submitted:
@@ -289,16 +290,16 @@ if submitted:
         호가전용면적 = round(row['호가전용면적'], 1) if pd.notna(row['호가전용면적']) else 면적
         출처 = row['가격출처']
         조건설명, _ = get_condition_note(cash, loan, area_group, condition, lines, household, row)
-        추천이유 = classify_recommendation(row, budget_upper)
+        추천이유 = classify_recommendation(row, budget_upper, total_budget)
 
         # 가격 출력
         실거래출력 = f"{실거래} (거래일: {거래일})"
         if 출처 == "호가":
-            호가출력 = f"{호가} (네이버 매물 호가)"
+            호가출력 = f"현재 호가: {호가} (네이버 매물 기준)"
         elif 출처 == "동일단지 유사평형 호가 추정":
-            호가출력 = f"{호가} (전용면적: {호가전용면적}㎡ 기준, 이전 실거래를 기반으로 계산된 임의 추정가로 시장 상황은 다를 수 있음)"
+            호가출력 = f"추정가: {호가} (전용면적: {호가전용면적}㎡ 기준, 이전 실거래를 기반으로 계산된 임의 추정가로 시장 상황은 다를 수 있음)"
         else:
-            호가출력 = "현재 매물은 없으나, 이전 실거래에 따라 추천되었으며, 매물이 나올 경우 이전 실거래와 현재 매물 가격은 다를 수 있음"
+            호가출력 = "현재 매물은 없으나, 이전 실거래에 따라 추천되었으며, 매물이 나올 경우 이전 실거래와 현재 매물 가격은 다를 수 있음을 알림."
 
         # 텍스트 형식으로 출력
         st.markdown(f"""
@@ -312,7 +313,7 @@ if submitted:
 
 **가격 정보**:  
 - 실거래 가격: {실거래출력}  
-- 현재 호가/추정가: {호가출력}  
+- {호가출력}  
 
 **추천 이유**:  
 {조건설명} {추천이유}  
@@ -322,7 +323,7 @@ if submitted:
 
     st.markdown("""
     ※ 위 추천은 사용자의 입력 조건과 2025.05 기준가를 종합하여 제안드린 결과입니다.  
-    ※ 본 추천은 동생의 내집마련을 위한 정보를 제공 목적으로 이루어지는 테스트이며, 투자 권유 또는 자문이 아닙니다.  
+    ※ 본 추천 결과는 동생의 내집마련을 위한 정보를 제공 목적으로 이루어지는 테스트이며, 투자 권유 또는 자문이 아닙니다.  
     ※ 실제 매수 결정 시에는 본인의 판단과 책임 하에 신중히 검토해주시기 바랍니다.  
     ※ 잠원동생집사 v0.1 - 20250521
     """)
