@@ -149,24 +149,23 @@ if submitted:
     df_filtered = df[df['실사용가격'] <= budget_upper].copy()
 
         # 3개 미만일 경우 예산 초과 일부 포함
-        if len(df_filtered) < 3:
-            extra = df[(df['실사용가격'] > budget_upper) & (df['실사용가격'] <= budget_cap)]
-            df_filtered = pd.concat([df_filtered, extra])
-            df_filtered = df_filtered.drop_duplicates(subset=['단지명', '전용면적'])
+    if len(df_filtered) < 3:
+        extra = df[(df['실사용가격'] > budget_upper) & (df['실사용가격'] <= budget_cap)]
+        df_filtered = pd.concat([df_filtered, extra])
+        df_filtered = df_filtered.drop_duplicates(subset=['단지명', '전용면적'])
 
     # 같은 단지 중복 제거, 세대수 기준 정렬
-    top3 = df_filtered.sort_values(by=["세대수", "점수"], ascending=[False, False])\
+top3 = df_filtered.sort_values(by=["세대수", "점수"], ascending=[False, False])\
                       .drop_duplicates(subset=["단지명"])\
                       .head(3)
 
-    top3['추천이유'] = top3.apply(classify_recommendation, axis=1)
+top3['추천이유'] = top3.apply(classify_recommendation, axis=1)
 
   # 조건 불일치 안내 메시지 출력
 condition_mismatch = False
 
 for _, row in top3.iterrows():
         
-
 # 현재 호가가 없을 경우 → 같은 단지의 다른 평형 호가 추정
     if pd.isna(row["현재호가"]):
         단지명 = row["단지명"]
