@@ -34,18 +34,20 @@ with st.form("user_input_form"):
 
 # --- 함수 정의 ---
 def get_area_range(area_group):
-    if area_group == "10평 이하": return (0, 33)
-    elif area_group == "20평대": return (34, 66)
-    elif area_group == "30평대": return (67, 99)
-    elif area_group == "40평 이상": return (100, 1000)
+    if area_group == "10평 이하": return (0, 19)
+    elif area_group == "20평대": return (20, 29)
+    elif area_group == "30평대": return (30, 39)
+    elif area_group == "40평 이상": return (40, 1000)
     return (0, 1000)
 
 def score_complex(row, area_group, condition, lines, household):
     score = 0
-    area = row['전용면적']
-    area_min, area_max = get_area_range(area_group)
-    if area_min <= area <= area_max: score += 1.5
-    elif area_group == "상관없음": score += 1
+    pyeong = row.get("평형") or get_pyeong(row["전용면적"])  # 평형 컬럼이 있으면 우선 사용
+    p_min, p_max = get_pyeong_range(area_group)
+    if p_min <= pyeong <= p_max:
+        score += 1.5
+    elif area_group == "상관없음":
+        score += 1
     building_type = str(row.get("건축유형", "")).strip()
     if condition == "상관없음" or condition in building_type: score += 1.5
     if "상관없음" not in lines:
@@ -60,7 +62,7 @@ def round_price(val):
     return f"{round(val, 2):.2f}억" if not pd.isna(val) and val >= 1.0 else "정보 없음"
 
 def get_pyeong(area):
-    return str(int(round(area / 3.3))) + "평"
+    return round(area / 3.3, 1) + "평"  # 기존에도 있던 함수
 
 def get_condition_note(cash, loan, area_group, condition, lines, household, row):
     notes = []
