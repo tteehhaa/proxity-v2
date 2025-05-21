@@ -93,14 +93,12 @@ if submitted:
         tag_list.append(유형)
         tag_str = " · ".join(tag_list)
 
-        # 컨디션 충족 여부 설명 분기
         matched_condition = condition in str(row.get("건축유형", ""))
         if matched_condition:
             condition_note = f"💡 선택하신 "{condition}" 컨디션을 충족하는 단지입니다."
         else:
             condition_note = f"""⚠️ "{condition}" 조건에 정확히 부합하지 않지만,
 예산과 유사 조건을 고려해 추천드리는 대안 단지입니다."""
-
 
         st.markdown(f"""#### 🏢 {단지명}
 - 전용면적: {면적}㎡ / 준공연도: {준공} / 세대수: {세대}세대
@@ -115,3 +113,4 @@ if submitted:
 
 💡 조건 충족도와 단지 규모 기준으로 우선순위 정렬된 단지입니다.
 """)
+
