@@ -165,12 +165,18 @@ if submitted:
 condition_mismatch = False
 
 for _, row in top3.iterrows():
-    # 1. 평형 조건 미일치
+    condition_mismatch = False  # 초기화
+
+    # 1. 평형 조건 미일치 여부 확인
     if area_group != "상관없음":
-        actual_p = int(float(row.get("평형", get_pyeong(row["전용면적"])).replace("평", "")))
-        p_min, p_max = get_area_range(area_group)
-        if not (p_min <= actual_p <= p_max):
-            condition_mismatch = True
+        try:
+            평형_str = row.get("평형", get_pyeong(row["전용면적"]))
+            평형_float = float(str(평형_str).replace("평", ""))
+            p_min, p_max = get_area_range(area_group)
+            if not (p_min <= 평형_float <= p_max):
+                condition_mismatch = True
+        except:
+            condition_mismatch = True  # 파싱 실패 시 미일치로 간주
 
     # 2. 건물 컨디션 미일치
     if condition != "상관없음" and condition not in str(row.get("건축유형", "")):
