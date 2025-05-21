@@ -96,6 +96,25 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
 
     return "입력하신 조건(" + ", ".join(notes) + ")에 따라 우선순위를 적용해 추천했습니다." if notes else "입력하신 조건을 기반으로 추천했습니다."
 
+# 현재 호가가 없을 경우 → 같은 단지의 다른 평형 호가 추정
+if pd.isna(row["현재호가"]):
+    단지명 = row["단지명"]
+    target_area = row["전용면적"]
+    단지_전체 = df[df["단지명"] == 단지명].copy()
+    단지_전체 = 단지_전체[단지_전체["현재호가"].notna()]
+
+    if not 단지_전체.empty:
+        # 가장 전용면적이 유사한 호가 찾기
+        단지_전체["면적차"] = abs(단지_전체["전용면적"] - target_area)
+        후보 = 단지_전체.sort_values(by="면적차").iloc[0]
+        대체_호가 = 후보["현재호가"]
+
+        # 가격 보정 후 적용 (면적 기준 환산 → target 면적 기준)
+        환산호가 = round((대체_호가 / 후보["전용면적"]) * target_area * 1.05, 2)  # 5% 정도 프리미엄 보정
+        row["현재호가"] = 환산호가
+        row["가격출처"] = "동일단지 유사평형 호가 추정"
+
+
 def classify_recommendation(row):
     if row['점수'] >= 4 and row['실사용가격'] <= budget_upper:
         return "예산과 조건을 모두 충족한 단지입니다."
@@ -203,8 +222,10 @@ if condition_mismatch:
         세대 = int(row['세대수']) if pd.notna(row['세대수']) else "미상"
         면적 = row['전용면적']
         평형 = row.get("평형", get_pyeong(면적))
+        # 마지막 실거래가 + 거래일 출력 포맷
         실거래가 = round_price(row['실거래가'])
-        거래일 = row['거래일'] if pd.notna(row['거래일']) and str(row['거래일']).startswith("2024") or str(row['거래일']).startswith("2025") else "2024년 이후 거래 없음"
+        거래일_raw = str(row['거래일']) if pd.notna(row['거래일']) else ""
+        거래일 = 거래일_raw if 거래일_raw.startswith("2024") or 거래일_raw.startswith("2025") else "2024년 이후 거래 없음"
         호가 = round_price(row['현재호가'])
         출처 = row['가격출처']
         조건설명 = get_condition_note(cash, loan, area_group, condition, lines, household, row)
