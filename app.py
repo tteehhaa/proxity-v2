@@ -14,7 +14,7 @@ with st.form("user_input_form"):
 
     col1, col2 = st.columns(2)
     with col1:
-        cash = st.number_input("현금(보유+기존주택 매각대금 포함)", 0.0, 100.0, value=16.0, step=0.5)
+        cash = st.number_input("현금(보유+기존주택 매각대금 포함, xx억)", 0.0, 100.0, value=16.0, step=0.5)
         loan = st.number_input("주택담보대출 가능 금액", 0.0, 30.0, value=12.0, step=0.5)
 
         area_group = st.selectbox("원하는 평형대는?", ["10평 이하", "20평대", "30평대", "40평 이상"])
@@ -22,7 +22,7 @@ with st.form("user_input_form"):
 
     with col2:
         lines = st.multiselect("선호하는 지하철 노선은?", ["3호선", "7호선", "9호선", "신분당선", "상관없음"])
-        household = st.selectbox("단지 규모는 어느 정도가 좋으세요?", ["대단지", "상관없음"])
+        household = st.selectbox("단지 규모는 어느 정도가 좋으세요?", ["대단지", "소단지" "상관없음"])
 
     total_budget = cash + loan
     submitted = st.form_submit_button("📍 지금 추천 받기")
@@ -56,8 +56,10 @@ def score_complex(row, total_budget, area_group, year_group, lines, household):
     else:
         score += 1
 
-    if household == "대단지" and row['세대수'] >= 200:
-        score += 1
+    if household == "대단지" and row['세대수'] >= 1000:
+        score += 1.5
+    elif household == "소단지":
+        score += 1.25
     elif household == "상관없음":
         score += 1
 
