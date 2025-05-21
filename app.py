@@ -39,6 +39,13 @@ def get_area_range(area_group):
     elif area_group == "30평대": return (30, 39)
     elif area_group == "40평 이상": return (40, 1000)
     return (0, 1000)
+    
+def get_pyeong_range(area_group):
+    if area_group == "10평 이하": return (0, 19)
+    elif area_group == "20평대": return (20, 29)
+    elif area_group == "30평대": return (30, 39)
+    elif area_group == "40평 이상": return (40, 1000)
+    return (0, 1000)
 
 def score_complex(row, area_group, condition, lines, household):
     score = 0
