@@ -55,7 +55,7 @@ def estimate_similar_asking_price(row, df):
         target_area = row['전용면적']
         similar_units = df[(df['단지명'] == complex_name) & df['현재호가'].notna()]
         if not similar_units.empty:
-            # 가장 가까운 면적의 호가 선택 (±5㎡)
+            # 가장 가까운 면적(±5㎡) 선택
             similar_units['면적차이'] = abs(similar_units['전용면적'] - target_area)
             closest_unit = similar_units.loc[similar_units['면적차이'].idxmin()]
             closest_area = closest_unit['전용면적']
@@ -75,7 +75,10 @@ def score_complex(row, cash, loan, area_group, condition, lines, household):
     elif area_group == "상관없음":
         score += 1
     building_type = str(row.get("건축유형", "")).strip()
-    if condition == "상관없음" or condition in building_type:
+    # 신축 조건 강화: 준공연도 2018년 이후 또는 '신축' 포함
+    if condition == "신축" and (row['준공연도'] >= 2018 or building_type == "신축"):
+        score += 2.5
+    elif condition == "상관없음" or condition == building_type:
         score += 1.5
     if "상관없음" not in lines:
         if row['역세권'] == "Y" and any(line in str(row.get("노선", "")) for line in lines):
@@ -90,9 +93,15 @@ def score_complex(row, cash, loan, area_group, condition, lines, household):
         score += 1
     return score
 
-def round_price(val):
-    """가격을 억 단위로 반올림"""
-    return f"{round(val, 2):.2f}억" if not pd.isna(val) and val >= 1.0 else "정보 없음"
+def round_price(val, price_type, is_estimated=False):
+    """가격을 억 단위로 반올림, 호가/추정가는 ±10% 범위 포함"""
+    if pd.isna(val) or val < 1.0:
+        return "정보 없음"
+    if price_type in ['호가', '동일단지 유사평형 호가 추정'] or is_estimated:
+        lower = round(val * 0.9, 2)
+        upper = round(val * 1.1, 2)
+        return f"{round(val, 2):.2f}억 ({lower:.2f}~{upper:.2f}억)"
+    return f"{round(val, 2):.2f}억"
 
 def get_condition_note(cash, loan, area_group, condition, lines, household, row):
     """사용자 조건과 단지 데이터 간 일치성 설명"""
@@ -110,7 +119,10 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
         else:
             condition_mismatch = True
     if condition != "상관없음":
-        if condition in str(row.get("건축유형", "")):
+        building_type = str(row.get("건축유형", "")).strip()
+        if condition == "신축" and (row['준공연도'] >= 2018 or building_type == "신축"):
+            notes.append("신축")
+        elif condition == building_type:
             notes.append(f"{condition}")
         else:
             condition_mismatch = True
@@ -158,6 +170,8 @@ if submitted:
     df['추정가'] = pd.to_numeric(df['2025.05_보정_추정실거래가'], errors='coerce')
     df['거래일'] = pd.to_datetime(df['거래일'], errors='coerce')
     df['거래연도'] = df['거래일'].dt.year
+    # 건축유형 표준화: 빈 값 처리
+    df['건축유형'] = df.apply(lambda row: '신축' if pd.notna(row['준공연도']) and row['준공연도'] >= 2018 else row.get('건축유형', '기축'), axis=1)
 
     # 필터링: 가격 1억 이상
     df = df[df['실거래가'] >= 1.0]
@@ -227,16 +241,19 @@ if submitted:
         세대 = int(row['세대수']) if pd.notna(row['세대수']) else "미상"
         면적 = row['전용면적']
         평형 = get_pyeong(면적)
-        실거래 = round_price(row['실사용가격'])
+        실거래 = round_price(row['실사용가격'], row['가격출처'], is_estimated=(row['가격출처'] == '동일단지 유사평형 호가 추정'))
         거래일 = row['거래일'].strftime("%Y.%m.%d") if pd.notna(row['거래일']) and row['거래연도'] >= 2024 else "최근 거래 없음"
         출처 = row['가격출처']
         조건설명, _ = get_condition_note(cash, loan, area_group, condition, lines, household, row)
         추천이유 = classify_recommendation(row, budget_upper)
 
+        # 가격 출력 형식 수정
+        가격출력 = f"실거래가: {실거래} (거래일: {거래일})" if 출처 == '실거래가' else f"호가: {실거래} (출처: {출처}, 거래일: {거래일})"
+
         st.markdown(f"""#### {단지명}
 - 평형: {평형}평 (전용면적: {round(면적, 1)}㎡)
 - 준공연도: {준공} / 세대수: {세대}
-- 가격: {실거래} (출처: {출처}, 거래일: {거래일})
+- 가격: {가격출력}
 - 조건 평가: {조건설명}
 - 추천 이유: {추천이유}
 """)
