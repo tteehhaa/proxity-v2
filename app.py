@@ -409,7 +409,7 @@ if submitted:
             호가 = round_price(row['현재호가'], row['가격출처'], is_estimated=(row['가격출처'] == '동일단지 유사평형 호가 추정'))
             호가전용면적 = round(row['호가전용면적'], 1) if pd.notna(row['호가전용면적']) else 면적
             출처 = row['가격출처']
-            조건설명, mismatch = get_condition_note(cash, loan, area_group, condition, lines, household, row, budget_upper, total_budget)
+            조건설명, mismatch = get_condition_note(cash, loan, area_group, condition, lines, household, row)
             추천이유, 예산초과여부 = classify_recommendation(row, budget_upper, total_budget)
 
             # 조건 충족 정도에 따른 마크 설정
