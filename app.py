@@ -411,7 +411,7 @@ if submitted:
         else:
             완전일치수 += 1
     
-    # 안내 메시지 출력
+    # ✅ 완전 일치만 존재
     if 완전일치수 == 3:
         st.markdown("""
     <div style="background-color: #e8f7e4; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
@@ -419,6 +419,7 @@ if submitted:
     </div>
     """, unsafe_allow_html=True)
     
+    # 🟠 혼합 (일치 + 일부 불일치)
     elif 완전일치수 >= 1 and 부분불일치수 >= 1:
         st.markdown("""
     <div style="background-color: #fffbe6; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
@@ -427,12 +428,14 @@ if submitted:
     </div>
     """, unsafe_allow_html=True)
     
+    # 🔴 전부 불일치
     elif 완전일치수 == 0 and 부분불일치수 > 0:
         st.markdown("""
     <div style="background-color: #fff0f0; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
     🔴 <strong>입력하신 조건에 완전히 부합하는 단지는 없으며, 일부 조건을 완화해 추천드립니다.</strong>
     </div>
     """, unsafe_allow_html=True)
+
 
 
 
