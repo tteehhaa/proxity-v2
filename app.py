@@ -22,7 +22,7 @@ with st.form("user_input_form"):
     with col1:
         cash = st.number_input("현금 (예: 16.0억)", min_value=0.0, max_value=100.0, value=3.0, step=0.5)
         loan = st.number_input("주택담보대출 가능 금액 (예: 12.0억)", min_value=0.0, max_value=30.0, value=3.0, step=0.5)
-        area_group = st.selectbox("원하는 평형대", ["상관없음", "10평 이하", "20평대", "30평대", "40평 이상"])
+        area_group = st.selectbox("원하는 평형대", ["상관없음", "10평대", "20평대", "30평대", "40평 이상"])
         condition = st.selectbox("건물 컨디션", ["상관없음", "신축", "기축", "리모델링", "재건축"])
     with col2:
         lines = st.multiselect("선호 지하철 노선", ["상관없음", "3호선", "7호선", "9호선", "신분당선"])
@@ -47,7 +47,7 @@ with st.form("user_input_form"):
 # --- 함수 정의 ---
 def get_area_range(area_group):
     """평형대 범위 반환 (평형 열 기준)"""
-    if area_group == "10평 이하": return (0, 10)
+    if area_group == "10평대": return (0, 19.9)
     elif area_group == "20평대": return (20, 29.9)
     elif area_group == "30평대": return (30, 39.9)
     elif area_group == "40평 이상": return (40, 1000)
