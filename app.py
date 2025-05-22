@@ -398,7 +398,7 @@ if submitted:
         세대 = int(row['세대수']) if pd.notna(row['세대수']) else "미상"
         평형 = row['평형']
         면적 = round(row['전용면적'], 1)
-        실거래 = round_price(row['실사용가격'], row['가격출처_실사용'], is_estimated=(row['가격출처_실사용'] == '동일단지 유사평형 호가 추정'))
+        실거래 = round_price(row['추천가격'], row['가격출처_실사용'], is_estimated=(row['가격출처_실사용'] == '동일단지 유사평형 호가 추정'))
         거래일 = row['거래일'].strftime("%Y.%m.%d") if pd.notna(row['거래일']) and row['거래연도'] >= 2024 else "최근 거래 없음"
         호가 = round_price(row['현재호가'], row['가격출처'], is_estimated=(row['가격출처'] == '동일단지 유사평형 호가 추정'))
         호가전용면적 = round(row['호가전용면적'], 1) if pd.notna(row['호가전용면적']) else 면적
