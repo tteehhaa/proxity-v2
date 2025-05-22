@@ -442,20 +442,21 @@ if submitted:
             <div style="background-color: #e8f7e4; padding: 8px; border-radius: 4px; margin-top: 8px;">
             ✅ 모든 조건에 완전히 부합하는 단지입니다.
             </div>
-            """
+            """.strip()
             elif 마크 == "🟠":
                 단지별_조건_메시지 = """
             <div style="background-color: #fffbe6; padding: 8px; border-radius: 4px; margin-top: 8px;">
             🟠 일부 조건이 부합하지 않지만 추천드리는 단지입니다. (평형, 컨디션, 노선, 세대수 중 일부 불일치)
             </div>
-            """
+            """.strip()
             elif 마크 == "🟡":
                 단지별_조건_메시지 = """
             <div style="background-color: #fffbe6; padding: 8px; border-radius: 4px; margin-top: 8px;">
             🟡 예산은 부합하지만 일부 조건이 맞지 않아 참고용으로 추천된 단지입니다.
             </div>
-            """
-
+            """.strip()
+            if 단지별_조건_메시지:
+                st.markdown(단지별_조건_메시지, unsafe_allow_html=True)
 
             # 텍스트 형식으로 출력
             st.markdown(f"""
@@ -472,8 +473,9 @@ if submitted:
     - {호가출력}  
 
     {단지별_조건_메시지}
-
+    st.markdown("<br>", unsafe_allow_html=True)  # ✅ 문단 간격 벌리기
     <strong>{추천메시지}</strong>
+    st.markdown("<br>", unsafe_allow_html=True)  # ✅ 문단 간격 벌리기
     """, unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)  # ✅ 문단 간격 벌리기
