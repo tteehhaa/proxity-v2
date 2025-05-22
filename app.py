@@ -150,6 +150,9 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
             notes.append(f"{area_group}")
         else:
             condition_mismatch = True
+    else:
+            condition_mismatch = False 
+        
     if condition != "상관없음":
         building_type = str(row.get("건축유형", "")).strip()
         if condition == "신축" and (row['준공연도'] >= 2018 or building_type == "신축"):
