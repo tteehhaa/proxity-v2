@@ -169,15 +169,13 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
             mismatch_flags.append(True)
 
     # ③ 노선
-    if not lines:  # '상관없음'이면 무조건 조건 일치로 처리
-        mismatch_flags.append(False)
-    else:
-        노선정보 = str(row.get("노선", ""))
-        if pd.notna(row.get("역세권")) and row['역세권'] == "Y" and any(line in 노선정보 for line in lines):
+    # ③ 노선
+    if lines and "상관없음" not in lines:
+        if row['역세권'] == "Y" and any(line in str(row.get("노선", "")) for line in lines):
             notes.append(f"{', '.join(lines)} 노선")
-            mismatch_flags.append(False)
-        else:
-            mismatch_flags.append(True)
+        # ✅ mismatch_flags.append(False) 또는 append(True) 하지 않음!
+        # → 조건설명은 추가되지만 평가에는 영향 안 미침
+
 
     # ④ 단지 규모
     if household != "상관없음":
