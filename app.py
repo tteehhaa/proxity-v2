@@ -455,8 +455,6 @@ if submitted:
             🟡 예산은 부합하지만 일부 조건이 맞지 않아 참고용으로 추천된 단지입니다.
             </div>
             """.strip()
-            if 단지별_조건_메시지:
-                st.markdown(단지별_조건_메시지, unsafe_allow_html=True)
 
             # 텍스트 형식으로 출력
             st.markdown(f"""
@@ -473,10 +471,9 @@ if submitted:
     - {호가출력}  
 
     {단지별_조건_메시지}
-    st.markdown("<br>", unsafe_allow_html=True)  # ✅ 문단 간격 벌리기
+    
     <strong>{추천메시지}</strong>
-    st.markdown("<br>", unsafe_allow_html=True)  # ✅ 문단 간격 벌리기
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)  # ✅ 문단 간격 벌리기
     
