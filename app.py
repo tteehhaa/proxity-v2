@@ -405,10 +405,10 @@ if submitted:
             완전일치수 += 1
     
     # 안내 메시지 출력
-    if 완전일치수 > 0:
+    if 완전일치수 = 3:
         st.markdown("""
     <div style="background-color: #e8f7e4; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-    ✅ <strong>모든 조건에 완전히 부합하는 단지</strong>가 포함되어 있습니다.
+    ✅ <strong>모든 조건에 완전히 부합하는 단지</strong>로 추천되었습니다.
     </div>
     """, unsafe_allow_html=True)
     
