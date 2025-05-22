@@ -26,7 +26,17 @@ with st.form("user_input_form"):
         condition = st.selectbox("건물 컨디션", ["상관없음", "신축", "기축", "리모델링", "재건축"])
     with col2:
         lines = st.multiselect("선호 지하철 노선", ["상관없음", "3호선", "7호선", "9호선", "신분당선"])
+        if "상관없음" in lines:
+            lines = []
         household = st.selectbox("단지 규모", ["상관없음", "1000세대 이상 대단지", "세대수 300세대 이상", "세대수 300세대 이하"])
+        household_map = {
+            "1000세대 이상 대단지": "대단지",
+            "세대수 300세대 이상": "소단지 (300세대 이상)",
+            "세대수 300세대 이하": "소단지 (300세대 이하)",
+            "상관없음": "상관없음"
+        }
+        household = household_map[household]
+
 
     # 예산 계산
     total_budget = cash + loan
@@ -241,7 +251,9 @@ if submitted:
 
         # 예산 내 단지 필터링 (54~66억 범위) 및 세대수 조건 추가
     budget_lower = total_budget * 0.9  # 54억
-    df_filtered = df[(df['실사용가격'] <= budget_upper) & (df['실사용가격'] >= budget_lower) & (df['세대수'] >= 300)].copy()
+    df_filtered = df[(df['실사용가격'] <= budget_upper) & (df['실사용가격'] >= budget_lower)]
+    if household != "상관없음":
+        df_filtered = df_filtered[df_filtered['세대수'] >= 300]
 
     # 신축 조건이 선택된 경우 준공연도 필터링
     if condition == "신축":
@@ -316,6 +328,7 @@ if submitted:
         출처 = row['가격출처']
         조건설명, _ = get_condition_note(cash, loan, area_group, condition, lines, household, row)
         추천이유 = classify_recommendation(row, budget_upper, total_budget)
+        추천메시지 = f"{조건설명} {추천이유}".strip()
 
         # 가격 출력
         실거래출력 = f"{실거래} (거래일: {거래일})"
@@ -340,8 +353,8 @@ if submitted:
 - 실거래 가격: {실거래출력}  
 - {호가출력}  
 
-**추천 이유**:  
-{조건설명} {추천이유}  
+**추천 이유**:  {추천메시지}
+
 
 ---
         """)
