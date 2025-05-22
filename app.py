@@ -428,7 +428,7 @@ if submitted:
     </div>
     """, unsafe_allow_html=True)
 
-    elif 완전일치수 == 3 and 부분불일치수 == 0:
+    elif 부분불일치수 == 0:
         st.markdown("""
     <div style="background-color: #e8f7e4; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
     ✅ <strong>모든 조건에 완전히 부합하는 단지들</strong>입니다.
