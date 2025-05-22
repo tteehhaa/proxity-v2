@@ -184,7 +184,7 @@ def classify_recommendation(row, budget_upper, total_budget):
     else:
         additional_budget = round(row['실사용가격'] - budget_upper, 2)
         return f"입력하신 예산을 초과하나, 조건에 부합해 추천드립니다. 약 {additional_budget}억의 추가 예산이 필요합니다."
-
+        
 # --- 데이터 처리 및 출력 ---
 if submitted:
     # 데이터 로드
