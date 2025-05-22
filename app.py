@@ -177,23 +177,18 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
     return condition_text, condition_mismatch
 
 def classify_recommendation(row, budget_upper, total_budget):
-    """추천 이유 분류: 예산 범위 및 10% 조건 반영, 매물 여부 반영"""
-    budget_ten_percent = total_budget * 0.1  # 예산의 10%
-    # 매물 여부 확인: 가격출처가 "호가"가 아니거나 현재호가가 없는 경우
-    has_naver_listing = (row['가격출처'] == "호가") and not pd.isna(row['현재호가'])
-
-    # 매물이 없는 경우
-    if not has_naver_listing:
+    price = row['실사용가격']
+    if pd.isna(price) or price <= 0:
         return "입력하신 조건을 고려할 때, 매물이 있다면 고려 가능합니다."
     
-    # 매물이 있는 경우 예산 조건에 따라 분류
-    if row['실사용가격'] <= total_budget:
+    if price <= total_budget:
         return "입력하신 예산 범위 내에 속하는 단지입니다."
-    elif row['실사용가격'] <= budget_upper:
+    elif price <= budget_upper:
         return "입력하신 예산의 10% 이내에 속하는 단지입니다."
     else:
-        additional_budget = round(row['실사용가격'] - budget_upper, 2)
-        return f"입력하신 예산을 초과하나, 조건에 부합해 추천드립니다. 약 {additional_budget}억의 추가 예산이 필요합니다."
+        over_ratio = ((price - total_budget) / total_budget) * 100
+        return f"입력하신 예산을 초과하나 조건에 부합해 추천드립니다. 약 {over_ratio:.1f}% 초과입니다."
+
 
 # --- 데이터 처리 및 출력 ---
 if submitted:
@@ -324,8 +319,8 @@ if submitted:
         df_extended = df[df['실사용가격'] > budget_upper].copy()
     
         # 예산 초과 상한 제한 (예산의 1.5배 초과는 제외)
-        fallback_price_limit = total_budget * 1.5
-        df_extended = df_extended[df_extended['실사용가격'] <= fallback_price_limit]
+        fallback_price_limit = total_budget * 1.15  # 최대 15%까지만 허용
+        df_extended = df[(df['실사용가격'] > total_budget) & (df['실사용가격'] <= fallback_price_limit)]
     
         # 평형 필터 추가
         if area_group != "상관없음":
