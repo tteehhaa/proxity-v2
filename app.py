@@ -250,54 +250,54 @@ if submitted:
     df = df[(df['거래연도'].isna()) | (df['거래연도'] >= 2024)]
 
     # 예산 내 단지 필터링 (예산 ±10%) + 평형 + 세대수 + 신축 조건
-budget_lower = total_budget * 0.9  # 최소 예산 허용 범위
-
-# 기본 필터: 예산
-df_filtered = df[
-    (df['실사용가격'] <= budget_upper) &
-    (df['실사용가격'] >= budget_lower)
-]
-
-# 평형 조건 적용
-if area_group != "상관없음":
-    p_min, p_max = get_area_range(area_group)
-    df_filtered = df_filtered[(df_filtered['평형'] >= p_min) & (df_filtered['평형'] <= p_max)]
-
-# 세대수 조건 적용
-if household != "상관없음":
-    df_filtered = df_filtered[df_filtered['세대수'] >= 300]
-
-# 신축 조건 적용
-if condition == "신축":
-    df_filtered = df_filtered[
-        (df_filtered['준공연도'] >= 2018) |
-        (df_filtered['건축유형'] == "신축")
+    budget_lower = total_budget * 0.9  # 최소 예산 허용 범위
+    
+    # 기본 필터: 예산
+    df_filtered = df[
+        (df['실사용가격'] <= budget_upper) &
+        (df['실사용가격'] >= budget_lower)
     ]
-
-# 정렬 기준 설정
-if condition != "상관없음":
-    df_filtered['신축_우선'] = df_filtered.apply(
-        lambda row: 1 if (condition == "신축" and row['준공연도'] >= 2018) or condition == row.get('건축유형', '') else 0,
-        axis=1
-    )
-    df_filtered = df_filtered.sort_values(
-        by=["신축_우선", "준공연도", "점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"],
-        ascending=[False, False, False, False, False, False, False]
-    )
-elif household != "상관없음":
-    df_filtered = df_filtered.sort_values(
-        by=["세대수", "점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"],
-        ascending=[False, False, False, False, False, False]
-    )
-else:
-    df_filtered = df_filtered.sort_values(
-        by=["점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"],
-        ascending=[False, False, False, False, False]
-    )
-
-# 단지 중복 제거 및 상위 3개 추출
-df_filtered = df_filtered.drop_duplicates(subset=['단지명'], keep='first')
-top3 = df_filtered.head(3)
+    
+    # 평형 조건 적용
+    if area_group != "상관없음":
+        p_min, p_max = get_area_range(area_group)
+        df_filtered = df_filtered[(df_filtered['평형'] >= p_min) & (df_filtered['평형'] <= p_max)]
+    
+    # 세대수 조건 적용
+    if household != "상관없음":
+        df_filtered = df_filtered[df_filtered['세대수'] >= 300]
+    
+    # 신축 조건 적용
+    if condition == "신축":
+        df_filtered = df_filtered[
+            (df_filtered['준공연도'] >= 2018) |
+            (df_filtered['건축유형'] == "신축")
+        ]
+    
+    # 정렬 기준 설정
+    if condition != "상관없음":
+        df_filtered['신축_우선'] = df_filtered.apply(
+            lambda row: 1 if (condition == "신축" and row['준공연도'] >= 2018) or condition == row.get('건축유형', '') else 0,
+            axis=1
+        )
+        df_filtered = df_filtered.sort_values(
+            by=["신축_우선", "준공연도", "점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"],
+            ascending=[False, False, False, False, False, False, False]
+        )
+    elif household != "상관없음":
+        df_filtered = df_filtered.sort_values(
+            by=["세대수", "점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"],
+            ascending=[False, False, False, False, False, False]
+        )
+    else:
+        df_filtered = df_filtered.sort_values(
+            by=["점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"],
+            ascending=[False, False, False, False, False]
+        )
+    
+    # 단지 중복 제거 및 상위 3개 추출
+    df_filtered = df_filtered.drop_duplicates(subset=['단지명'], keep='first')
+    top3 = df_filtered.head(3)
 
     # 단지 2개일 경우 예산 초과 단지 중 최저 예산 단지 추가
     if len(top3) == 2:
