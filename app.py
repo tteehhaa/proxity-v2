@@ -323,6 +323,10 @@ if submitted:
     
         df_extended = df_extended.drop_duplicates(subset=['단지명'], keep='first')
         부족한개수 = 3 - len(top3)
+
+        df_extended = df_extended[~df_extended['단지명'].isin(top3['단지명'])]
+
+        
         if not df_extended.empty:
             top3 = pd.concat([top3, df_extended.head(부족한개수)], ignore_index=True)
 
@@ -405,7 +409,11 @@ if submitted:
         출처 = row['가격출처']
         조건설명, _ = get_condition_note(cash, loan, area_group, condition, lines, household, row)
         추천이유 = classify_recommendation(row, budget_upper, total_budget)
-        추천메시지 = f"{조건설명} {추천이유}".strip()
+        if 추천이유 and 추천이유 != "None":
+            추천메시지 = f"{조건설명} {추천이유}".strip()
+        else:
+            추천메시지 = 조건설명
+
 
         # 가격 출력
         실거래출력 = f"{실거래} (거래일: {거래일})"
