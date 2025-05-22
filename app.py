@@ -216,7 +216,12 @@ if submitted:
     df['추정가'] = pd.to_numeric(df['2025.05_보정_추정실거래가'], errors='coerce')
     df['거래일'] = pd.to_datetime(df['거래일'], errors='coerce')
     df['거래연도'] = df['거래일'].dt.year
-    df['건축유형'] = df.apply(lambda row: '신축' if pd.notna(row['준공연도']) and row['준공연도'] >= 2018 else row.get('건축유형', '기축'), axis=1)
+    # 이미 '신축'인 경우를 보호
+    df['건축유형'] = df.apply(
+        lambda row: row['건축유형'] if row['건축유형'] == '신축'
+        else ('신축' if pd.notna(row['준공연도']) and row['준공연도'] >= 2018 else row.get('건축유형', '기축')),
+        axis=1
+    )
     df[['건축유형', '역세권', '노선']] = df.groupby('단지명')[['건축유형', '역세권', '노선']].fillna(method="ffill")
 
     # 필터링: 가격 1억 이상
@@ -260,7 +265,7 @@ if submitted:
     if area_group != "상관없음":
         p_min, p_max = get_area_range(area_group)
         df_filtered = df_filtered[
-            (df_filtered['평형'] >= p_min) & (df_filtered['평형'] <= p_max)
+            (df_filtered['평형'].apply(math.floor) >= p_min) & (df_filtered['평형'].apply(math.floor) <= p_max)
         ]
     
     # 세대수 조건
