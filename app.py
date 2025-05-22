@@ -393,21 +393,33 @@ if submitted:
             condition_mismatch = True
             break
 
-    # 조건 완전 일치 메시지
-    if not condition_mismatch:
+    # 조건 일치도 집계
+    완전일치수 = 0
+    부분불일치수 = 0
+    
+    for _, row in top3.iterrows():
+        _, mismatch = get_condition_note(cash, loan, area_group, condition, lines, household, row)
+        if mismatch:
+            부분불일치수 += 1
+        else:
+            완전일치수 += 1
+    
+    # 안내 메시지 출력
+    if 완전일치수 > 0:
         st.markdown("""
     <div style="background-color: #e8f7e4; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-    ✅ <strong>모든 조건에 완전히 부합하는 단지</strong>를 추천드립니다.
+    ✅ <strong>모든 조건에 완전히 부합하는 단지</strong>가 포함되어 있습니다.
     </div>
     """, unsafe_allow_html=True)
     
-    # 조건 불일치 메시지
-    if condition_mismatch:
+    if 부분불일치수 > 0:
         st.markdown("""
     <div style="background-color: #fff4e5; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-    ⚠️ <strong>주의:</strong> 입력하신 조건(<strong>평형, 컨디션, 노선, 세대수</strong>)에 <strong>일부 불일치</strong>가 있는 경우, 조건을 완화해 <strong>추천</strong>드립니다.
+    🟠 <strong>일부 조건 불일치 단지</strong>도 함께 추천되었습니다.  
+    <strong>평형, 컨디션, 노선, 세대수</strong> 조건 중 일부가 완전히 일치하지 않을 수 있습니다.
     </div>
     """, unsafe_allow_html=True)
+
 
 
     # 추천 결과 출력 (텍스트 형식)
