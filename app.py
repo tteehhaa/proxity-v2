@@ -210,7 +210,8 @@ if submitted:
         st.stop()
 
     # 데이터 전처리
-    df[['단지명', '준공연도', '세대수', '건축유형', '역세권', '노선']] = df[['단지명', '준공연도', '세대수', '건축유형', '역세권', '노선']].fillna(method="ffill")
+    # 단지명 기준으로 세대수, 준공연도, 건축유형, 역세권, 노선 채우기
+    df[['단지명', '준공연도', '세대수', '건축유형', '역세권', '노선']] = df.groupby('단지명')[['단지명', '준공연도', '세대수', '건축유형', '역세권', '노선']].fillna(method="ffill").fillna(method="bfill")
     df['실거래가'] = pd.to_numeric(df['2025.03'], errors='coerce')
     df['현재호가'] = pd.to_numeric(df['20250521호가'], errors='coerce')
     df['추정가'] = pd.to_numeric(df['2025.05_보정_추정실거래가'], errors='coerce')
@@ -222,7 +223,7 @@ if submitted:
         else ('신축' if pd.notna(row['준공연도']) and row['준공연도'] >= 2018 else row.get('건축유형', '기축')),
         axis=1
     )
-    df[['건축유형', '역세권', '노선']] = df.groupby('단지명')[['건축유형', '역세권', '노선']].fillna(method="ffill")
+    df[['건축유형', '역세권', '노선']] = df.groupby('단지명')[['건축유형', '역세권', '노선']].fillna(method="ffill").fillna(method="bfill")
 
     # 필터링: 가격 1억 이상
     df = df[df['실거래가'] >= 1.0]
@@ -250,27 +251,30 @@ if submitted:
     mask_추정 = df['실사용가격'].isna() & df['추정가'].notna()
     df.loc[mask_추정, '실사용가격'] = df['추정가']
     df.loc[mask_추정, '가격출처_실사용'] = '추정'
+    # 실사용가격이 0이거나 NaN인 경우 제외
+    df = df[df['실사용가격'].notna() & (df['실사용가격'] > 0)]
 
     # 오래된 거래 제외
     df = df[(df['거래연도'].isna()) | (df['거래연도'] >= 2024)]
     
     # 예산 내 단지 필터링 (예산 ±10%)
     budget_lower = total_budget * 0.9
-    df_filtered = df[
-        (df['실사용가격'] <= budget_upper) &
-        (df['실사용가격'] >= budget_lower)
-    ]
+    df_filtered = df[(df['실사용가격'] <= budget_upper) & (df['실사용가격'] >= budget_lower)].copy()
     
     # 평형 조건 필터링 (평형 기준)
     if area_group != "상관없음":
         p_min, p_max = get_area_range(area_group)
         df_filtered = df_filtered[
-            (df_filtered['평형'].apply(math.floor) >= p_min) & (df_filtered['평형'].apply(math.floor) <= p_max)
+            (df_filtered['평형'] >= p_min) & (df_filtered['평형'] <= p_max)
         ]
     
     # 세대수 조건
-    if household != "상관없음":
-        df_filtered = df_filtered[df_filtered['세대수'] >= 300]
+    if household == "대단지":
+        df_filtered = df_filtered[df_filtered['세대수'] >= 1000]
+    elif household == "소단지 (300세대 이상)":
+        df_filtered = df_filtered[(df_filtered['세대수'] >= 300) & (df_filtered['세대수'] < 1000)]
+    elif household == "소단지 (300세대 이하)":
+        df_filtered = df_filtered[df_filtered['세대수'] < 300]
     
     # 신축 조건
     if condition == "신축":
