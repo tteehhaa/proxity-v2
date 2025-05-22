@@ -239,8 +239,9 @@ if submitted:
     # 오래된 거래 제외
     df = df[(df['거래연도'].isna()) | (df['거래연도'] >= 2024)]
 
-        # 예산 내 단지 필터링 (budget_upper 이내)
-    df_filtered = df[df['실사용가격'] <= budget_upper].copy()
+    # 예산 내 단지 필터링 (54~66억 범위)
+    budget_lower = total_budget * 0.9  # 54억
+    df_filtered = df[(df['실사용가격'] <= budget_upper) & (df['실사용가격'] >= budget_lower)].copy()
     
     # 정렬 기준 설정
     if condition != "상관없음":
