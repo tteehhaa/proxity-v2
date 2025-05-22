@@ -310,25 +310,34 @@ if submitted:
             top3 = pd.concat([top3, df_extended.head(부족한개수)], ignore_index=True)
 
     
-    # ✅ 단지 수 부족 시, 예산 초과 단지 중 일부 조건 부합 단지 보완 추천
+    # fallback 추천: 예산 초과 단지 중 평형 조건도 만족하고 예산 초과 폭이 제한된 단지 보완
     if len(top3) < 3:
         df_extended = df[df['실사용가격'] > budget_upper].copy()
-        
-        # 조건 정렬: 예산 초과지만 조건 일치도가 높은 순
+    
+        # 예산 초과 상한 제한 (예산의 1.5배 초과는 제외)
+        fallback_price_limit = total_budget * 1.5
+        df_extended = df_extended[df_extended['실사용가격'] <= fallback_price_limit]
+    
+        # 평형 필터 추가
+        if area_group != "상관없음":
+            p_min, p_max = get_area_range(area_group)
+            df_extended = df_extended[(df_extended['평형'] >= p_min) & (df_extended['평형'] <= p_max)]
+    
+        # 점수 재계산
         df_extended["점수"] = df_extended.apply(lambda row: score_complex(row, cash, loan, area_group, condition, lines, household), axis=1)
         df_extended["상관_점수"] = df_extended.apply(lambda row: score_correlated_factors(row, area_group, condition, lines, household), axis=1)
-        
+    
         df_extended = df_extended.sort_values(
             by=["실사용가격", "점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"],
             ascending=[True, False, False, False, False, False]
         )
+    
         df_extended = df_extended.drop_duplicates(subset=['단지명'], keep='first')
     
-        # 부족한 개수만큼만 추가
         부족한개수 = 3 - len(top3)
         if not df_extended.empty:
             top3 = pd.concat([top3, df_extended.head(부족한개수)], ignore_index=True)
-    
+
     # 안내 메시지 출력
     if len(top3) == 0:
         st.markdown("""
