@@ -148,10 +148,13 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
     if area_group != "상관없음":
         if p_min <= actual_pyeong <= p_max:
             notes.append(f"{area_group}")
+            condition_mismatch = False
         else:
             condition_mismatch = True
     else:
-            condition_mismatch = False 
+        # '상관없음'이면 평형 미적용 → 예산 기준으로 판단 (불일치 아님)
+        condition_mismatch = False
+
         
     if condition != "상관없음":
         building_type = str(row.get("건축유형", "")).strip()
