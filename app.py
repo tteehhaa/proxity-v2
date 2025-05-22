@@ -321,7 +321,9 @@ if submitted:
         # 예산 초과 상한 제한 (예산의 1.5배 초과는 제외)
         fallback_price_limit = total_budget * 1.15  # 최대 15%까지만 허용
         df_extended = df[(df['실사용가격'] > total_budget) & (df['실사용가격'] <= fallback_price_limit)]
-    
+        df_extended = df_extended.sort_values(by=["실사용가격"], ascending=[True])
+        df_extended = df_extended.drop_duplicates(subset=['단지명'], keep='first')  # 저렴한 평형 우선
+
         # 평형 필터 추가
         if area_group != "상관없음":
             p_min, p_max = get_area_range(area_group)
