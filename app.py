@@ -239,9 +239,21 @@ if submitted:
     # 오래된 거래 제외
     df = df[(df['거래연도'].isna()) | (df['거래연도'] >= 2024)]
 
-    # 예산 내 단지 필터링 (budget_upper 이내)
+        # 예산 내 단지 필터링 (budget_upper 이내)
     df_filtered = df[df['실사용가격'] <= budget_upper].copy()
-    df_filtered = df_filtered.sort_values(by=["점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"], ascending=[False, False, False, False, False])
+    
+    # 정렬 기준 설정
+    if condition != "상관없음":
+        # 건물 컨디션 선택 시: 신축 여부 우선, 준공연도 최신 순
+        df_filtered['신축_우선'] = df_filtered.apply(lambda row: 1 if (condition == "신축" and row['준공연도'] >= 2018) or condition == row.get('건축유형', '') else 0, axis=1)
+        df_filtered = df_filtered.sort_values(by=["신축_우선", "준공연도", "점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"], ascending=[False, False, False, False, False, False, False])
+    elif household != "상관없음":
+        # 세대수 선택 시: 세대수 큰 순
+        df_filtered = df_filtered.sort_values(by=["세대수", "점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"], ascending=[False, False, False, False, False, False])
+    else:
+        # 둘 다 상관없음: 기존 정렬 기준
+        df_filtered = df_filtered.sort_values(by=["점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"], ascending=[False, False, False, False, False])
+    
     df_filtered = df_filtered.drop_duplicates(subset=['단지명'], keep='first')
     top3 = df_filtered.head(3)
 
