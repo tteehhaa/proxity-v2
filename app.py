@@ -1,9 +1,4 @@
-if 완전일치수 == 3:
-        st.markdown("""
-    <div style="background-color: #e8f7e4; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-    ✅ <strong>모든 조건에 완전히 부합하는 단지들</strong>입니다.
-    </div>
-    """, unsafe_allow_html=True)
+
 import streamlit as st
 import pandas as pd
 import math
