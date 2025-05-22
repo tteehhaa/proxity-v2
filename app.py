@@ -345,42 +345,6 @@ if submitted:
         top3 = top3.head(3)
 
     
-        # 조건 일치도 집계
-        완전일치수 = 0
-        부분불일치수 = 0
-        
-        for _, row in top3.iterrows():
-            _, mismatch = get_condition_note(cash, loan, area_group, condition, lines, household, row)
-            if mismatch:
-                부분불일치수 += 1
-            else:
-                완전일치수 += 1
-    
-            # 안내 메시지 출력    
-            if 완전일치수 == 3:
-                st.markdown("""
-        <div style="background-color: #e8f7e4; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-        ✅ <strong>모든 조건에 완전히 부합하는 단지들</strong>입니다.
-        </div>
-        """, unsafe_allow_html=True)
-        
-            elif 완전일치수 == 0:
-                st.markdown("""
-        <div style="background-color: #fff0f0; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-        🔴 <strong>입력하신 조건에 완전히 부합하는 단지는 없으며, 일부 조건을 완화해 추천드립니다.</strong>
-        </div>
-        """, unsafe_allow_html=True)
-        
-            else:
-                st.markdown(f"""
-        <div style="background-color: #fffbe6; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-        🟠 <strong>일부 단지는 입력하신 조건에 완전히 부합하지 않을 수 있습니다.</strong><br>
-        (<strong>평형, 컨디션, 노선, 세대수</strong> 중 일부 조건 미충족)
-        </div>
-        """, unsafe_allow_html=True)
-    
-
-    
     # fallback 추천: 예산 초과 단지 중 평형 조건도 만족하고 예산 초과 폭이 제한된 단지 보완
     if len(top3) < 3:
         df_extended = df[df['추천가격'] > budget_upper].copy()
@@ -414,7 +378,7 @@ if submitted:
         if not df_extended.empty:
             top3 = pd.concat([top3, df_extended.head(부족한개수)], ignore_index=True)
 
-    # 안내 메시지 출력
+        # 추천 결과 출력 (텍스트 형식)
     if len(top3) == 0:
         st.markdown("""
         **안내**: 2025년 5월 기준, 현재 잠원동 아파트 가운데 추천 가능한 단지가 없습니다.  
@@ -424,76 +388,79 @@ if submitted:
         추가 조건 조정이나 상담이 필요하시면 말씀해주세요!
         """)
         st.stop()
-    elif len(top3) < 3:
-        st.markdown("""
-        **안내**: 입력 조건에 정확히 부합하는 단지가 부족하여, 일부 조건을 완화해 추가로 추천드립니다.  
-        """)
+    else:
+        st.markdown(f"### 추천 단지 ({len(top3)}개)")
+        for idx, row in top3.iterrows():
+            단지명 = row['단지명']
+            준공 = int(row['준공연도']) if pd.notna(row['준공연도']) else "미상"
+            세대 = int(row['세대수']) if pd.notna(row['세대수']) else "미상"
+            평형 = row['평형']
+            면적 = round(row['전용면적'], 1)
+            실거래 = round_price(row['추천가격'], row['가격출처_실사용'], is_estimated=(row['가격출처_실사용'] == '동일단지 유사평형 호가 추정'))
+            거래일 = row['거래일'].strftime("%Y.%m.%d") if pd.notna(row['거래일']) and row['거래연도'] >= 2024 else "최근 거래 없음"
+            호가 = round_price(row['현재호가'], row['가격출처'], is_estimated=(row['가격출처'] == '동일단지 유사평형 호가 추정'))
+            호가전용면적 = round(row['호가전용면적'], 1) if pd.notna(row['호가전용면적']) else 면적
+            출처 = row['가격출처']
+            조건설명, mismatch = get_condition_note(cash, loan, area_group, condition, lines, household, row, budget_upper, total_budget)
+            추천이유, 예산초과여부 = classify_recommendation(row, budget_upper, total_budget)
 
+            # 조건 충족 정도에 따른 마크 설정
+            if 예산초과여부 and "제외" in 추천이유:
+                마크 = "🟠"  # 예산 초과로 제외
+            elif mismatch:
+                마크 = "🟡"  # 일부 조건 불일치
+            else:
+                마크 = "🟢"  # 완전 조건 일치
 
-    # 조건 불일치 확인
-    condition_mismatch = False
-    for _, row in top3.iterrows():
-        _, mismatch = get_condition_note(cash, loan, area_group, condition, lines, household, row)
-        if mismatch:
-            condition_mismatch = True
-            break
+            추천메시지 = f"{마크} {조건설명} {추천이유}".strip()
+
+            # 추정가 기반인 경우 메시지 보완
+            if row['가격출처_실사용'] == '동일단지 유사평형 호가 추정':
+                추천메시지 += " 이 가격은 과거 실거래 기준의 단순 추정이며, 실제 매물 가격은 달라질 수 있습니다."
     
+            # 가격 출력
+            실거래출력 = f"{실거래} (거래일: {거래일})"
+            if 출처 == "호가":
+                호가출력 = f"현재 호가: {호가} (네이버 매물 기준)"
+            elif 출처 == "동일단지 유사평형 호가 추정":
+                호가출력 = f"현재 호가: 현재 매물 없음. (단, 내부 시스템에 의할 때 예산 내의 호가로 추정)"
+            else:
+                호가출력 = "현재 매물은 없으나, 이전 실거래에 따라 추천되었습니다. 매물이 나올 경우 이전 실거래와 현재 매물 가격은 다를 수 있습니다."
 
-    # 추천 결과 출력 (텍스트 형식)
-    st.markdown("### 추천 단지")
-    for idx, row in top3.iterrows():
-        단지명 = row['단지명']
-        준공 = int(row['준공연도']) if pd.notna(row['준공연도']) else "미상"
-        세대 = int(row['세대수']) if pd.notna(row['세대수']) else "미상"
-        평형 = row['평형']
-        면적 = round(row['전용면적'], 1)
-        실거래 = round_price(row['추천가격'], row['가격출처_실사용'], is_estimated=(row['가격출처_실사용'] == '동일단지 유사평형 호가 추정'))
-        거래일 = row['거래일'].strftime("%Y.%m.%d") if pd.notna(row['거래일']) and row['거래연도'] >= 2024 else "최근 거래 없음"
-        호가 = round_price(row['현재호가'], row['가격출처'], is_estimated=(row['가격출처'] == '동일단지 유사평형 호가 추정'))
-        호가전용면적 = round(row['호가전용면적'], 1) if pd.notna(row['호가전용면적']) else 면적
-        출처 = row['가격출처']
-        조건설명, mismatch = get_condition_note(cash, loan, area_group, condition, lines, household, row)
-        추천이유, 예산초과여부 = classify_recommendation(row, budget_upper, total_budget)
+            # "잠원 대우아이빌"에만 조건 메시지 추가
+            단지별_조건_메시지 = ""
+            if 단지명 == "잠원 대우아이빌":
+                if 마크 == "🟢":
+                    단지별_조건_메시지 = """
+                    <div style="background-color: #e8f7e4; padding: 8px; border-radius: 4px; margin-top: 8px;">
+                    ✅ 모든 조건에 완전히 부합하는 단지들입니다.
+                    </div>
+                    """
+                elif 마크 == "🟠":
+                    단지별_조건_메시지 = """
+                    <div style="background-color: #fffbe6; padding: 8px; border-radius: 4px; margin-top: 8px;">
+                    🟠 일부 단지는 입력하신 조건에 완전히 부합하지 않을 수 있습니다. (평형, 컨디션, 노선, 세대수 중 일부 조건 미충족)
+                    </div>
+                    """
 
-        # 조건 충족 정도에 따른 마크 설정
-        if 예산초과여부 and "제외" in 추천이유:
-            마크 = "🟠"  # 예산 초과로 제외
-        elif mismatch:
-            마크 = "🟡"  # 일부 조건 불일치
-        else:
-            마크 = "🟢"  # 완전 조건 일치
+            # 텍스트 형식으로 출력
+            st.markdown(f"""
+    #### **{단지명}**
 
-        추천메시지 = f"{마크} {조건설명} {추천이유}".strip()
+    **기본 정보**:  
+    - 평형: {평형}평  
+    - 전용면적: {면적}㎡  
+    - 준공연도: {준공}  
+    - 세대수: {세대}  
 
-        # 추정가 기반인 경우 메시지 보완
-        if row['가격출처_실사용'] == '동일단지 유사평형 호가 추정':
-            추천메시지 += " 이 가격은 과거 실거래 기준의 단순 추정이며, 실제 매물 가격은 달라질 수 있습니다."
-    
-        # 가격 출력
-        실거래출력 = f"{실거래} (거래일: {거래일})"
-        if 출처 == "호가":
-            호가출력 = f"현재 호가: {호가} (네이버 매물 기준)"
-        elif 출처 == "동일단지 유사평형 호가 추정":
-            호가출력 = f"현재 호가: 현재 매물 없음. (단, 내부 시스템에 의할 때 예산 내의 호가로 추정)"
-        else:
-            호가출력 = "현재 매물은 없으나, 이전 실거래에 따라 추천되었습니다. 매물이 나올 경우 이전 실거래와 현재 매물 가격은 다를 수 있습니다."
+    **가격 정보**:  
+    - 실거래 가격: {실거래출력}  
+    - {호가출력}  
 
-        # 텍스트 형식으로 출력
-        st.markdown(f"""
-#### **{단지명}**
+    {단지별_조건_메시지}
 
-**기본 정보**:  
-- 평형: {평형}평  
-- 전용면적: {면적}㎡  
-- 준공연도: {준공}  
-- 세대수: {세대}  
-
-**가격 정보**:  
-- 실거래 가격: {실거래출력}  
-- {호가출력}  
-
-<strong>{추천메시지}</strong>
-""", unsafe_allow_html=True)
+    <strong>{추천메시지}</strong>
+    """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)  # ✅ 문단 간격 벌리기
     
