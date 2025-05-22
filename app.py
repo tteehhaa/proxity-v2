@@ -343,6 +343,43 @@ if submitted:
 
         top3 = top3.drop_duplicates(subset=['단지명'], keep='first')
         top3 = top3.head(3)
+
+    
+        # 조건 일치도 집계
+        완전일치수 = 0
+        부분불일치수 = 0
+        
+        for _, row in top3.iterrows():
+            _, mismatch = get_condition_note(cash, loan, area_group, condition, lines, household, row)
+            if mismatch:
+                부분불일치수 += 1
+            else:
+                완전일치수 += 1
+    
+            # 안내 메시지 출력    
+            if 완전일치수 == 3:
+                st.markdown("""
+        <div style="background-color: #e8f7e4; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+        ✅ <strong>모든 조건에 완전히 부합하는 단지들</strong>입니다.
+        </div>
+        """, unsafe_allow_html=True)
+        
+            elif 완전일치수 == 0:
+                st.markdown("""
+        <div style="background-color: #fff0f0; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+        🔴 <strong>입력하신 조건에 완전히 부합하는 단지는 없으며, 일부 조건을 완화해 추천드립니다.</strong>
+        </div>
+        """, unsafe_allow_html=True)
+        
+            else:
+                st.markdown(f"""
+        <div style="background-color: #fffbe6; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+        🟠 <strong>{완전일치수}개 단지는 조건에 완전히 부합</strong>하며,  
+        <strong>{부분불일치수}개 단지는 일부 조건을 완화해 추천</strong>되었습니다.
+        </div>
+        """, unsafe_allow_html=True)
+    
+
     
     # fallback 추천: 예산 초과 단지 중 평형 조건도 만족하고 예산 초과 폭이 제한된 단지 보완
     if len(top3) < 3:
@@ -400,41 +437,6 @@ if submitted:
         if mismatch:
             condition_mismatch = True
             break
-    
-        # 조건 일치도 집계
-    완전일치수 = 0
-    부분불일치수 = 0
-    
-    for _, row in top3.iterrows():
-        _, mismatch = get_condition_note(cash, loan, area_group, condition, lines, household, row)
-        if mismatch:
-            부분불일치수 += 1
-        else:
-            완전일치수 += 1
-        
-    # 안내 메시지 출력    
-    if 완전일치수 == 3:
-        st.markdown("""
-    <div style="background-color: #e8f7e4; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-    ✅ <strong>모든 조건에 완전히 부합하는 단지들</strong>입니다.
-    </div>
-    """, unsafe_allow_html=True)
-    
-    elif 완전일치수 == 0 and 부분불일치수 > 0:
-        st.markdown("""
-    <div style="background-color: #fff0f0; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-    🔴 <strong>입력하신 조건에 완전히 부합하는 단지는 없으며, 일부 조건을 완화해 추천드립니다.</strong>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    elif 부분불일치수 > 0:
-        st.markdown("""
-    <div style="background-color: #fffbe6; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-    🟠 <strong>일부 단지는 입력하신 조건에 완전히 부합하지 않을 수 있습니다.</strong><br>
-    (<strong>평형, 컨디션, 노선, 세대수</strong> 중 일부 조건 미충족)
-    </div>
-    """, unsafe_allow_html=True)
-
     
 
     # 추천 결과 출력 (텍스트 형식)
