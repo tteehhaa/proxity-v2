@@ -138,57 +138,64 @@ def round_price(val, price_type, is_estimated=False):
 def get_condition_note(cash, loan, area_group, condition, lines, household, row):
     """사용자 조건 설명"""
     notes = []
-    condition_mismatch = False
+    mismatch_flags = []  # 조건별 불일치 여부 저장
+
     if cash > 0:
         notes.append(f"현금 {cash}억")
     if loan > 0:
         notes.append(f"대출 {loan}억")
+
+    # ① 평형
     actual_pyeong = row["평형"]
     p_min, p_max = get_area_range(area_group)
     if area_group != "상관없음":
         if p_min <= actual_pyeong <= p_max:
             notes.append(f"{area_group}")
-            condition_mismatch = False
+            mismatch_flags.append(False)
         else:
-            condition_mismatch = True
-    else:
-        # '상관없음'이면 평형 미적용 → 예산 기준으로 판단 (불일치 아님)
-        condition_mismatch = False
+            mismatch_flags.append(True)
 
-        
+    # ② 건물 컨디션
     if condition != "상관없음":
         building_type = str(row.get("건축유형", "")).strip()
         if condition == "신축" and (row['준공연도'] >= 2018 or building_type == "신축"):
             notes.append("신축")
+            mismatch_flags.append(False)
         elif condition == building_type:
             notes.append(f"{condition}")
+            mismatch_flags.append(False)
         else:
-            condition_mismatch = True
-    else:
-        condition_mismatch = False  # 추가!
-        
-    if "상관없음" not in lines:
+            mismatch_flags.append(True)
+
+    # ③ 노선
+    if lines and "상관없음" not in lines:
         if row['역세권'] == "Y" and any(line in str(row.get("노선", "")) for line in lines):
             notes.append(f"{', '.join(lines)} 노선")
+            mismatch_flags.append(False)
         else:
-            condition_mismatch = True
-    else:
-        condition_mismatch = False  # 추가!
-    
+            mismatch_flags.append(True)
+
+    # ④ 단지 규모
     if household != "상관없음":
         세대수 = row['세대수'] if pd.notna(row['세대수']) else 0
         if household == "대단지" and 세대수 >= 1000:
             notes.append("대단지")
+            mismatch_flags.append(False)
         elif household == "소단지 (300세대 이상)" and 300 <= 세대수 < 1000:
             notes.append("소단지 (300세대 이상)")
+            mismatch_flags.append(False)
         elif household == "소단지 (300세대 이하)" and 세대수 < 300:
             notes.append("소단지 (300세대 이하)")
+            mismatch_flags.append(False)
         else:
-            condition_mismatch = True
-    else:
-        condition_mismatch = False  # 추가!
-        
+            mismatch_flags.append(True)
+
+    # ✅ 최종 판단
+    condition_mismatch = any(mismatch_flags)
+
+    # 출력용 조건 텍스트
     condition_text = "입력하신 조건(" + ", ".join(notes) + ")에 따라 추천된 단지입니다." if notes else "입력하신 조건을 기반으로 추천된 단지입니다."
+    
     return condition_text, condition_mismatch
 
 def classify_recommendation(row, budget_upper, total_budget):
@@ -439,12 +446,13 @@ if submitted:
         추천이유, 예산초과여부 = classify_recommendation(row, budget_upper, total_budget)
 
         # 조건 충족 정도에 따른 마크 설정
-        if 추천이유 is None or 예산초과여부:
-            마크 = "🟠"  # 예산 초과 등으로 조건 불충족
+        if 추천이유 is None or "제외" in 추천이유:
+            마크 = "🟠"  # 예산 초과 등으로 제외되는 단지
         elif mismatch:
             마크 = "🟡"  # 일부 조건 불일치
         else:
             마크 = "🟢"  # 완전 조건 일치
+
 
         추천메시지 = f"{마크} {조건설명} {추천이유}".strip()
 
