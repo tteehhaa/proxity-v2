@@ -169,15 +169,15 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
             mismatch_flags.append(True)
 
     # ③ 노선
-    if not lines:  # '상관없음' 또는 선택 없음 → 무조건 통과
+    if not lines:  # '상관없음'이면 무조건 조건 일치로 처리
         mismatch_flags.append(False)
     else:
-        if row['역세권'] == "Y" and any(line in str(row.get("노선", "")) for line in lines):
+        노선정보 = str(row.get("노선", ""))
+        if pd.notna(row.get("역세권")) and row['역세권'] == "Y" and any(line in 노선정보 for line in lines):
             notes.append(f"{', '.join(lines)} 노선")
             mismatch_flags.append(False)
         else:
             mismatch_flags.append(True)
-
 
     # ④ 단지 규모
     if household != "상관없음":
