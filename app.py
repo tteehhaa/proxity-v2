@@ -169,7 +169,8 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
 def classify_recommendation(row, budget_upper, total_budget):
     """추천 이유 분류: 예산 범위 및 10% 조건 반영, 매물 여부 반영"""
     budget_ten_percent = total_budget * 0.1  # 예산의 10%
-    has_naver_listing = row['가격출처'] == "호가"  # 네이버 매물 여부 확인 ("호가"가 아닌 경우 매물 없음)
+    # 매물 여부 확인: 가격출처가 "호가"가 아니거나 현재호가가 없는 경우
+    has_naver_listing = (row['가격출처'] == "호가") and not pd.isna(row['현재호가'])
 
     # 매물이 없는 경우
     if not has_naver_listing:
