@@ -316,13 +316,18 @@ if submitted:
         if not df_extended.empty:
             top3 = pd.concat([top3, df_extended.head(부족한개수)], ignore_index=True)
 
-        top3 = top3.sort_values(by='추천가격')  # 예산에 가까운 평형 우선
+        top3['예산차이'] = abs(top3['추천가격'] - total_budget)
+        top3 = top3.sort_values(by=['예산차이', '점수', '상관_점수'], ascending=[True, False, False])
+
         top3 = top3.drop_duplicates(subset=['단지명'], keep='first')
         top3 = top3.head(3)
     
     # fallback 추천: 예산 초과 단지 중 평형 조건도 만족하고 예산 초과 폭이 제한된 단지 보완
     if len(top3) < 3:
         df_extended = df[df['추천가격'] > budget_upper].copy()
+        fallback_price_limit = total_budget * 1.15  # 15% 초과 매물 제외
+        df_extended = df_extended[df_extended['추천가격'] <= fallback_price_limit]
+
     
         # 예산 초과 상한 제한 (예산의 1.5배 초과는 제외)
         fallback_price_limit = total_budget * 1.15  # 최대 15%까지만 허용
