@@ -379,11 +379,22 @@ if submitted:
             condition_mismatch = True
             break
 
+    # 조건 완전 일치 메시지
+    if not condition_mismatch:
+        st.markdown("""
+    <div style="background-color: #e8f7e4; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+    ✅ <strong>모든 조건에 완전히 부합하는 단지</strong>를 추천드립니다.
+    </div>
+    """, unsafe_allow_html=True)
+    
     # 조건 불일치 메시지
     if condition_mismatch:
         st.markdown("""
-        **안내**: 입력하신 조건(평형, 컨디션, 노선, 세대수)에 정확히 부합하는 단지가 없는 경우 일부 조건을 완화해 추천드립니다.
-        """)
+    <div style="background-color: #fff4e5; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+    ⚠️ <strong>주의:</strong> 입력하신 조건(<strong>평형, 컨디션, 노선, 세대수</strong>)에 <strong>일부 불일치</strong>가 있는 경우, 조건을 완화해 <strong>추천</strong>드립니다.
+    </div>
+    """, unsafe_allow_html=True)
+
 
     # 추천 결과 출력 (텍스트 형식)
     st.markdown("### 추천 단지")
@@ -429,7 +440,8 @@ if submitted:
 - 실거래 가격: {실거래출력}  
 - {호가출력}  
 
-**추천 이유**:  {추천메시지}
+<strong>{추천메시지}</strong>
+""", unsafe_allow_html=True)
 
 
 ---
