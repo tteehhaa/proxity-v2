@@ -374,8 +374,8 @@ if submitted:
             else:
                 st.markdown(f"""
         <div style="background-color: #fffbe6; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-        🟠 <strong>{완전일치수}개 단지는 조건에 완전히 부합</strong>하며,  
-        <strong>{부분불일치수}개 단지는 일부 조건을 완화해 추천</strong>되었습니다.
+        🟠 <strong>일부 단지는 입력하신 조건에 완전히 부합하지 않을 수 있습니다.</strong><br>
+        (<strong>평형, 컨디션, 노선, 세대수</strong> 중 일부 조건 미충족)
         </div>
         """, unsafe_allow_html=True)
     
