@@ -177,31 +177,18 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
     return condition_text, condition_mismatch
 
 def classify_recommendation(row, budget_upper, total_budget):
-    """추천 이유 분류: 실사용가격 기준으로, 출처별 예산 초과 비율에 따라 다르게 설명"""
     price = row['추천가격']
-    if price <= total_budget:
-        return "입력하신 예산 범위 내에 속하는 단지입니다."
-    elif price <= budget_upper:
-        percent_over = round((price - total_budget) / total_budget * 100, 1)
-        return f"예산을 약 {percent_over}% 초과하지만 조건에 부합하여 참고할 만합니다."
-    else:
-        return None  # 이건 추천에 포함되면 안 됨
+    if pd.isna(price):
+        return "가격 정보가 부족하여 신중한 판단이 필요합니다."
+
+    초과금액 = round(price - total_budget, 2)
+    초과비율 = round(초과금액 / total_budget * 100, 1)
 
     if price <= total_budget:
         return "입력하신 예산 범위 내에 속하는 단지입니다."
-    
     elif price <= budget_upper:
-        return f"예산을 {초과비율}% 초과했지만 10% 이내로, 추천드릴 만합니다. 약 {초과금액}억 추가 예산 필요"
+        return f"예산을 약 {초과비율}% 초과하지만 다른 조건에 부합하거나 고려해볼만하여 추천 드립니다. (약 {초과금액}억 추가 필요)"
 
-    elif price <= total_budget * 1.15:
-        # 실거래가가 있는 경우만 15% 허용
-        if source == "실거래가":
-            return f"예산을 {초과비율}% 초과했지만 실거래 기준으로 조건 부합해 추가 추천합니다. 약 {초과금액}억 초과"
-        else:
-            return f"예산을 {초과비율}% 초과하여 일반 추천에서 제외됩니다 (현재 가격 출처: {source})"
-
-    else:
-        return f"예산 대비 {초과비율}% 초과로 추천 대상에서 제외됩니다. (현재 가격: {price:.2f}억)"
 
 
 
@@ -414,7 +401,9 @@ if submitted:
         else:
             추천메시지 = 조건설명
 
-
+        if row['가격출처_실사용'] == '동일단지 유사평형 호가 추정':
+            추천메시지 += " ※ 이 가격은 과거 실거래 기준의 단순 추정이며, 실제 매물 가격은 달라질 수 있습니다."
+    
         # 가격 출력
         실거래출력 = f"{실거래} (거래일: {거래일})"
         if 출처 == "호가":
