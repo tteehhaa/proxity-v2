@@ -117,7 +117,7 @@ def score_correlated_factors(row, area_group, condition, lines, household):
 def round_price(val, price_type, is_estimated=False):
     """가격을 억 단위로 반올림, 실거래가는 범위 없이 정확한 금액, 호가/추정가는 +10% 범위 포함"""
     if pd.isna(val) or val < 1.0:
-        return "현재 매물 없으나, 매물이 나올 경우 예산 범위 내로 추정"
+        return "현재 매물 없음"
     if price_type == "실거래가":
         return f"{round(val, 2):.2f}억"
     if price_type in ["호가", "동일단지 유사평형 호가 추정"] or is_estimated:
@@ -169,22 +169,21 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
 def classify_recommendation(row, budget_upper, total_budget):
     """추천 이유 분류: 예산 범위 및 10% 조건 반영, 매물 여부 반영"""
     budget_ten_percent = total_budget * 0.1  # 예산의 10%
-    has_naver_listing = row['가격출처'] == "호가"  # 네이버 매물 여부 확인
+    has_naver_listing = row['가격출처'] == "호가"  # 네이버 매물 여부 확인 ("호가"가 아닌 경우 매물 없음)
 
+    # 매물이 없는 경우
+    if not has_naver_listing:
+        return "입력하신 조건을 고려할 때, 매물이 있다면 고려 가능합니다."
+    
+    # 매물이 있는 경우 예산 조건에 따라 분류
     if row['실사용가격'] <= total_budget:
-        if has_naver_listing:
-            return "입력하신 예산 범위 내에 속하는 단지입니다."
-        else:
-            return "입력하신 조건을 고려할 때, 매물이 있다면 고려 가능합니다."
+        return "입력하신 예산 범위 내에 속하는 단지입니다."
     elif row['실사용가격'] <= budget_upper:
-        if has_naver_listing:
-            return "입력하신 예산의 10% 이내에 속하는 단지입니다."
-        else:
-            return "입력하신 조건을 고려할 때, 매물이 있다면 고려 가능합니다."
+        return "입력하신 예산의 10% 이내에 속하는 단지입니다."
     else:
         additional_budget = round(row['실사용가격'] - budget_upper, 2)
         return f"입력하신 예산을 초과하나, 조건에 부합해 추천드립니다. 약 {additional_budget}억의 추가 예산이 필요합니다."
-        
+
 # --- 데이터 처리 및 출력 ---
 if submitted:
     # 데이터 로드
@@ -307,7 +306,7 @@ if submitted:
         elif 출처 == "동일단지 유사평형 호가 추정":
             호가출력 = f"추정가: {호가} (전용면적: {호가전용면적}㎡ 기준, 이전 실거래를 기반으로 계산된 임의 추정가로 시장 상황은 다를 수 있음)"
         else:
-            호가출력 = "현재 매물은 없으나, 이전 실거래에 따라 추천되었으며, 매물이 나올 경우 이전 실거래와 현재 매물 가격은 다를 수 있음을 알림."
+            호가출력 = "현재 매물은 없으나, 이전 실거래에 따라 추천되었습니다. 매물이 나올 경우 이전 실거래와 현재 매물 가격은 다를 수 있습니다."
 
         # 텍스트 형식으로 출력
         st.markdown(f"""
