@@ -411,21 +411,29 @@ if submitted:
         else:
             완전일치수 += 1
     
-    # 안내 메시지
+    # 안내 메시지 출력
     if 완전일치수 == 3:
         st.markdown("""
-        <div style="background-color: #e8f7e4; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-        ✅ <strong>모든 조건에 완전히 부합하는 단지</strong>들입니다.
-        </div>
-        """, unsafe_allow_html=True)
+    <div style="background-color: #e8f7e4; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+    ✅ <strong>모든 조건에 완전히 부합하는 단지들</strong>입니다.
+    </div>
+    """, unsafe_allow_html=True)
     
-    elif 부분불일치수 > 0:
+    elif 완전일치수 >= 1 and 부분불일치수 >= 1:
         st.markdown("""
-        <div style="background-color: #fff4e5; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-        🟠 <strong>일부 조건 불일치 단지</strong>도 함께 추천되었습니다.  
-        <strong>평형, 컨디션, 노선, 세대수</strong> 조건 중 일부가 완전히 일치하지 않을 수 있습니다.
-        </div>
-        """, unsafe_allow_html=True)
+    <div style="background-color: #fffbe6; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+    🟠 <strong>일부 단지는 입력하신 조건에 완전히 부합하지 않을 수 있습니다.</strong><br>
+    (평형, 컨디션, 노선, 세대수 중 일부 조건 미충족)
+    </div>
+    """, unsafe_allow_html=True)
+    
+    elif 완전일치수 == 0 and 부분불일치수 > 0:
+        st.markdown("""
+    <div style="background-color: #fff0f0; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+    🔴 <strong>입력하신 조건에 완전히 부합하는 단지는 없으며, 일부 조건을 완화해 추천드립니다.</strong>
+    </div>
+    """, unsafe_allow_html=True)
+
 
 
     # 추천 결과 출력 (텍스트 형식)
@@ -492,6 +500,6 @@ if submitted:
     ※ 본 추천 결과는 동생의 내집마련을 위한 정보를 제공 목적으로 이루어지는 테스트이며, 투자 권유 또는 자문이 아닙니다.  
     ※ 위 추천은 사용자의 입력 조건과 2025.05 기준가를 종합하여 제안드린 결과입니다.  
     ※ 실제 매수 결정 시에는 본인의 판단과 책임 하에 신중히 검토해주시기 바랍니다.  
-    ※ 잠원동생집사 v0.1 - 20250521
+    ※ 잠원동생집사 v0.1 - 20250521  
     **@Proxity**
     """)
