@@ -191,7 +191,7 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
             mismatch_flags.append(True)
 
     # ✅ 최종 판단
-    condition_mismatch = any(mismatch_flags)
+    condition_mismatch = any(mismatch_flags) if mismatch_flags else False
 
     # 출력용 조건 텍스트
     condition_text = "입력하신 조건(" + ", ".join(notes) + ")에 따라 추천된 단지입니다." if notes else "입력하신 조건을 기반으로 추천된 단지입니다."
@@ -400,7 +400,7 @@ if submitted:
             condition_mismatch = True
             break
     
-    # 조건 일치도 집계
+        # 조건 일치도 집계
     완전일치수 = 0
     부분불일치수 = 0
     
@@ -411,7 +411,7 @@ if submitted:
         else:
             완전일치수 += 1
     
-    # ✅ 완전 일치만 존재
+    # 안내 메시지 출력
     if 완전일치수 == 3:
         st.markdown("""
     <div style="background-color: #e8f7e4; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
@@ -419,7 +419,6 @@ if submitted:
     </div>
     """, unsafe_allow_html=True)
     
-    # 🟠 혼합 (일치 + 일부 불일치)
     elif 완전일치수 >= 1 and 부분불일치수 >= 1:
         st.markdown("""
     <div style="background-color: #fffbe6; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
@@ -428,16 +427,12 @@ if submitted:
     </div>
     """, unsafe_allow_html=True)
     
-    # 🔴 전부 불일치
     elif 완전일치수 == 0 and 부분불일치수 > 0:
         st.markdown("""
     <div style="background-color: #fff0f0; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
     🔴 <strong>입력하신 조건에 완전히 부합하는 단지는 없으며, 일부 조건을 완화해 추천드립니다.</strong>
     </div>
     """, unsafe_allow_html=True)
-
-
-
 
     # 추천 결과 출력 (텍스트 형식)
     st.markdown("### 추천 단지")
@@ -456,16 +451,14 @@ if submitted:
         추천이유, 예산초과여부 = classify_recommendation(row, budget_upper, total_budget)
 
         # 조건 충족 정도에 따른 마크 설정
-        if 추천이유 is None or "제외" in 추천이유:
-            마크 = "🟠"  # 예산 초과 등으로 제외되는 단지
+        if 예산초과여부 and "제외" in 추천이유:
+            마크 = "🟠"  # 예산 초과로 제외
         elif mismatch:
             마크 = "🟡"  # 일부 조건 불일치
         else:
             마크 = "🟢"  # 완전 조건 일치
 
-
         추천메시지 = f"{마크} {조건설명} {추천이유}".strip()
-
 
         # 추정가 기반인 경우 메시지 보완
         if row['가격출처_실사용'] == '동일단지 유사평형 호가 추정':
