@@ -178,15 +178,14 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
 
 def classify_recommendation(row, budget_upper, total_budget):
     """추천 이유 분류: 실사용가격 기준으로, 출처별 예산 초과 비율에 따라 다르게 설명"""
-    price = row['실사용가격']
-    source = row['가격출처_실사용']  # '실거래가' or '호가' or '추정'
-
-    if pd.isna(price) or price <= 0:
-        return "가격 정보가 불충분하여 추천 신뢰도가 낮습니다."
-
-    # 기준 계산
-    초과금액 = round(price - total_budget, 2)
-    초과비율 = round(초과금액 / total_budget * 100, 1)
+    price = row['추천가격']
+    if price <= total_budget:
+        return "입력하신 예산 범위 내에 속하는 단지입니다."
+    elif price <= budget_upper:
+        percent_over = round((price - total_budget) / total_budget * 100, 1)
+        return f"예산을 약 {percent_over}% 초과하지만 조건에 부합하여 참고할 만합니다."
+    else:
+        return None  # 이건 추천에 포함되면 안 됨
 
     if price <= total_budget:
         return "입력하신 예산 범위 내에 속하는 단지입니다."
@@ -254,7 +253,8 @@ if submitted:
     df[['현재호가', '가격출처', '호가전용면적']] = df.apply(lambda row: pd.Series(estimate_similar_asking_price(row, df)), axis=1)
 
     # 실사용가격 설정
-    df['실사용가격'] = df['실거래가']
+    df['추천가격'] = df['현재호가']
+    df.loc[df['추천가격'].isna(), '추천가격'] = df['추정가']
     df['가격출처_실사용'] = df['가격출처'].fillna('실거래가')
     mask_호가 = df['실사용가격'].isna() & df['현재호가'].notna()
     df.loc[mask_호가, '실사용가격'] = df['현재호가']
@@ -263,7 +263,7 @@ if submitted:
     df.loc[mask_추정, '실사용가격'] = df['추정가']
     df.loc[mask_추정, '가격출처_실사용'] = '추정'
     # 실사용가격이 0이거나 NaN인 경우 제외
-    df = df[df['실사용가격'].notna() & (df['실사용가격'] > 0)]
+    df = df[df['추천가격'].notna() & (df['추천가격'] > 0)]
 
     # 오래된 거래 제외
     df = df[(df['거래연도'].isna()) | (df['거래연도'] >= 2024)]
@@ -302,6 +302,7 @@ if submitted:
     
     # 단지 중복 제거 및 상위 3개 추출
     df_filtered = df_filtered.drop_duplicates(subset=['단지명'], keep='first')
+    df_filtered = df_filtered[df_filtered['추천가격'] <= budget_upper]  # 안전장치
     top3 = df_filtered.head(3)
     
     # ✅ fallback 추천: 예산 초과 단지 중 평형 조건도 만족하는 단지 보완
@@ -329,6 +330,9 @@ if submitted:
         if not df_extended.empty:
             top3 = pd.concat([top3, df_extended.head(부족한개수)], ignore_index=True)
 
+        top3 = top3.sort_values(by='추천가격')  # 예산에 가까운 평형 우선
+        top3 = top3.drop_duplicates(subset=['단지명'], keep='first')
+        top3 = top3.head(3)
     
     # fallback 추천: 예산 초과 단지 중 평형 조건도 만족하고 예산 초과 폭이 제한된 단지 보완
     if len(top3) < 3:
