@@ -161,11 +161,17 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
             notes.append(f"{condition}")
         else:
             condition_mismatch = True
+    else:
+        condition_mismatch = False  # 추가!
+        
     if "상관없음" not in lines:
         if row['역세권'] == "Y" and any(line in str(row.get("노선", "")) for line in lines):
             notes.append(f"{', '.join(lines)} 노선")
         else:
             condition_mismatch = True
+    else:
+        condition_mismatch = False  # 추가!
+    
     if household != "상관없음":
         세대수 = row['세대수'] if pd.notna(row['세대수']) else 0
         if household == "대단지" and 세대수 >= 1000:
@@ -176,6 +182,9 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
             notes.append("소단지 (300세대 이하)")
         else:
             condition_mismatch = True
+    else:
+        condition_mismatch = False  # 추가!
+        
     condition_text = "입력하신 조건(" + ", ".join(notes) + ")에 따라 추천된 단지입니다." if notes else "입력하신 조건을 기반으로 추천된 단지입니다."
     return condition_text, condition_mismatch
 
