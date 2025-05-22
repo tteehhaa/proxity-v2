@@ -242,6 +242,10 @@ if submitted:
         # 예산 내 단지 필터링 (54~66억 범위) 및 세대수 조건 추가
     budget_lower = total_budget * 0.9  # 54억
     df_filtered = df[(df['실사용가격'] <= budget_upper) & (df['실사용가격'] >= budget_lower) & (df['세대수'] >= 300)].copy()
+
+    # 신축 조건이 선택된 경우 준공연도 필터링
+    if condition == "신축":
+        df_filtered = df_filtered[(df_filtered['준공연도'] >= 2018) | (df_filtered['건축유형'] == "신축")]
     
     # 정렬 기준 설정
     if condition != "상관없음":
