@@ -48,9 +48,10 @@ with st.form("user_input_form"):
 def get_area_range(area_group):
     """평형대 범위 반환 (평형 열 기준)"""
     if area_group == "10평대": return (0, 19.9)
-    elif area_group == "20평대": return (20, 29.9)
-    elif area_group == "30평대": return (30, 39.9)
-    elif area_group == "40평 이상": return (40, 1000)
+    elif area_group == "20평대": return (19.9, 29.9)
+    elif area_group == "30평대": return (29.9, 39.9)
+    elif area_group == "40평 이상": return (39.9, 1000)
+    return (0, 1000)
 
 def estimate_similar_asking_price(row, df):
     """동일 단지 내 유사 평형 호가 추정"""
