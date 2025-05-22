@@ -26,7 +26,7 @@ with st.form("user_input_form"):
         condition = st.selectbox("건물 컨디션", ["상관없음", "신축", "기축", "리모델링", "재건축"])
     with col2:
         lines = st.multiselect("선호 지하철 노선", ["상관없음", "3호선", "7호선", "9호선", "신분당선"])
-        household = st.selectbox("단지 규모", ["상관없음", "대단지", "소단지 (300세대 이상)", "소단지 (300세대 이하)"])
+        household = st.selectbox("단지 규모", ["상관없음", "1000세대 이상 대단지", "세대수 300세대 이상", "세대수 300세대 이하"])
 
     # 예산 계산
     total_budget = cash + loan
@@ -239,9 +239,9 @@ if submitted:
     # 오래된 거래 제외
     df = df[(df['거래연도'].isna()) | (df['거래연도'] >= 2024)]
 
-    # 예산 내 단지 필터링 (54~66억 범위)
+        # 예산 내 단지 필터링 (54~66억 범위) 및 세대수 조건 추가
     budget_lower = total_budget * 0.9  # 54억
-    df_filtered = df[(df['실사용가격'] <= budget_upper) & (df['실사용가격'] >= budget_lower)].copy()
+    df_filtered = df[(df['실사용가격'] <= budget_upper) & (df['실사용가격'] >= budget_lower) & (df['세대수'] >= 300)].copy()
     
     # 정렬 기준 설정
     if condition != "상관없음":
