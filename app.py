@@ -190,7 +190,15 @@ def get_condition_note(cash, loan, area_group, condition, lines, household, row)
             mismatch_flags.append(False)
         else:
             mismatch_flags.append(True)
-
+    # 예산 조건
+    추천가격 = row['추천가격']
+    if pd.notna(추천가격):
+        _, 예산초과여부 = classify_recommendation(row, budget_upper, total_budget)
+        if 예산초과여부:
+            mismatch_flags.append(True)
+        else:
+            mismatch_flags.append(False)
+            
     # ✅ 최종 판단
     condition_mismatch = any(mismatch_flags) if mismatch_flags else False
 
@@ -417,7 +425,7 @@ if submitted:
             # 추정가 기반인 경우 메시지 보완
             if row['가격출처_실사용'] == '동일단지 유사평형 호가 추정':
                 추천메시지 += " 이 가격은 과거 실거래 기준의 단순 추정이며, 실제 매물 가격은 달라질 수 있습니다."
-    
+
             # 가격 출력
             실거래출력 = f"{실거래} (거래일: {거래일})"
             if 출처 == "호가":
@@ -427,21 +435,20 @@ if submitted:
             else:
                 호가출력 = "현재 매물은 없으나, 이전 실거래에 따라 추천되었습니다. 매물이 나올 경우 이전 실거래와 현재 매물 가격은 다를 수 있습니다."
 
-            # "잠원 대우아이빌"에만 조건 메시지 추가
+            # 모든 단지에 대해 조건 메시지 추가
             단지별_조건_메시지 = ""
-            if 단지명 == "잠원 대우아이빌":
-                if 마크 == "🟢":
-                    단지별_조건_메시지 = """
-                    <div style="background-color: #e8f7e4; padding: 8px; border-radius: 4px; margin-top: 8px;">
-                    ✅ 모든 조건에 완전히 부합하는 단지들입니다.
-                    </div>
-                    """
-                elif 마크 == "🟠":
-                    단지별_조건_메시지 = """
-                    <div style="background-color: #fffbe6; padding: 8px; border-radius: 4px; margin-top: 8px;">
-                    🟠 일부 단지는 입력하신 조건에 완전히 부합하지 않을 수 있습니다. (평형, 컨디션, 노선, 세대수 중 일부 조건 미충족)
-                    </div>
-                    """
+            if 마크 == "🟢":
+                단지별_조건_메시지 = """
+                <div style="background-color: #e8f7e4; padding: 8px; border-radius: 4px; margin-top: 8px;">
+                ✅ 모든 조건에 완전히 부합하는 단지들입니다.
+                </div>
+                """
+            elif 마크 == "🟠":
+                단지별_조건_메시지 = """
+                <div style="background-color: #fffbe6; padding: 8px; border-radius: 4px; margin-top: 8px;">
+                🟠 일부 단지는 입력하신 조건에 완전히 부합하지 않을 수 있습니다. (평형, 컨디션, 노선, 세대수 중 일부 조건 미충족)
+                </div>
+                """
 
             # 텍스트 형식으로 출력
             st.markdown(f"""
@@ -462,7 +469,7 @@ if submitted:
     <strong>{추천메시지}</strong>
     """, unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)  # ✅ 문단 간격 벌리기
+        st.markdown("<br>", unsafe_allow_html=True)  # ✅ 문단 간격 벌리기
     
     st.markdown("""
     ※ 본 추천 결과는 동생의 내집마련을 위한 정보를 제공 목적으로 이루어지는 테스트이며, 투자 권유 또는 자문이 아닙니다.  
