@@ -1,4 +1,10 @@
-import streamlit as st
+if 완전일치수 == 3:
+        st.markdown("""
+    <div style="background-color: #e8f7e4; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+    ✅ <strong>모든 조건에 완전히 부합하는 단지들</strong>입니다.
+    </div>
+    """, unsafe_allow_html=True)
+    import streamlit as st
 import pandas as pd
 import math
 import os
@@ -411,9 +417,8 @@ if submitted:
         else:
             완전일치수 += 1
     
-    # 안내 메시지 출력
-    
-    if 완전일치수 >= 1 and 부분불일치수 >= 1:
+    # 안내 메시지 출력    
+    if 부분불일치수 >= 1:
         st.markdown("""
     <div style="background-color: #fffbe6; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
     🟠 <strong>일부 단지는 입력하신 조건에 완전히 부합하지 않을 수 있습니다.</strong><br>
