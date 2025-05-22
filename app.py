@@ -298,31 +298,42 @@ if submitted:
     # 단지 중복 제거 및 상위 3개 추출
     df_filtered = df_filtered.drop_duplicates(subset=['단지명'], keep='first')
     top3 = df_filtered.head(3)
-
-    # 단지 2개일 경우 예산 초과 단지 중 최저 예산 단지 추가
-    if len(top3) == 2:
+    
+    # ✅ 단지 수 부족 시, 예산 초과 단지 중 일부 조건 부합 단지 보완 추천
+    if len(top3) < 3:
         df_extended = df[df['실사용가격'] > budget_upper].copy()
-        df_extended = df_extended.sort_values(by=["실사용가격", "점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"], ascending=[True, False, False, False, False, False])
+        
+        # 조건 정렬: 예산 초과지만 조건 일치도가 높은 순
+        df_extended["점수"] = df_extended.apply(lambda row: score_complex(row, cash, loan, area_group, condition, lines, household), axis=1)
+        df_extended["상관_점수"] = df_extended.apply(lambda row: score_correlated_factors(row, area_group, condition, lines, household), axis=1)
+        
+        df_extended = df_extended.sort_values(
+            by=["실사용가격", "점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"],
+            ascending=[True, False, False, False, False, False]
+        )
         df_extended = df_extended.drop_duplicates(subset=['단지명'], keep='first')
+    
+        # 부족한 개수만큼만 추가
+        부족한개수 = 3 - len(top3)
         if not df_extended.empty:
-            top3 = pd.concat([top3, df_extended.head(1)], ignore_index=True)
-
-    # 추천 단지 부족 시 메시지
+            top3 = pd.concat([top3, df_extended.head(부족한개수)], ignore_index=True)
+    
+    # 안내 메시지 출력
     if len(top3) == 0:
         st.markdown("""
         **안내**: 현재 잠원동 아파트의 호가가 입력하신 예산보다 높게 형성되어 추천 가능한 단지가 없습니다.  
         2025년 5월 기준, 잠원동 아파트 시장은 호가가 실거래가보다 높게 형성되어 있습니다.  
+    
         - 예산을 상향 조정해 보세요.  
         - 시장이 안정화될 때까지 기다려보는 것도 방법입니다.  
         추가 조건 조정이나 상담이 필요하시면 말씀해주세요!
         """)
         st.stop()
-    elif len(top3) < 3 and len(top3) > 0:
+    elif len(top3) < 3:
         st.markdown("""
-        **안내**: 현재 잠원동 아파트의 호가가 입력하신 예산보다 높게 형성되어 추천 단지가 제한적입니다.  
-        아래 단지 중 일부는 예산을 약간 초과하나, 조건에 부합해 추가로 추천드립니다.  
-        추가 조건 조정이나 대안을 원하시면 말씀해주세요!
+        **안내**: 입력 조건에 정확히 부합하는 단지가 부족하여, 일부 조건을 완화해 추가로 추천드립니다.  
         """)
+
 
     # 조건 불일치 확인
     condition_mismatch = False
