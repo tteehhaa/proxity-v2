@@ -399,7 +399,7 @@ if submitted:
         if mismatch:
             condition_mismatch = True
             break
-
+    
     # 조건 일치도 집계
     완전일치수 = 0
     부분불일치수 = 0
@@ -411,22 +411,21 @@ if submitted:
         else:
             완전일치수 += 1
     
-    # 안내 메시지 출력
+    # 안내 메시지
     if 완전일치수 == 3:
         st.markdown("""
-    <div style="background-color: #e8f7e4; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-    ✅ <strong>모든 조건에 완전히 부합하는 단지</strong>로 추천되었습니다.
-    </div>
-    """, unsafe_allow_html=True)
+        <div style="background-color: #e8f7e4; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+        ✅ <strong>모든 조건에 완전히 부합하는 단지</strong>들입니다.
+        </div>
+        """, unsafe_allow_html=True)
     
-    if 부분불일치수 > 0:
+    elif 부분불일치수 > 0:
         st.markdown("""
-    <div style="background-color: #fff4e5; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-    🟠 <strong>일부 조건 불일치 단지</strong>도 함께 추천되었습니다.  
-    <strong>평형, 컨디션, 노선, 세대수</strong> 조건 중 일부가 완전히 일치하지 않을 수 있습니다.
-    </div>
-    """, unsafe_allow_html=True)
-
+        <div style="background-color: #fff4e5; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+        🟠 <strong>일부 조건 불일치 단지</strong>도 함께 추천되었습니다.  
+        <strong>평형, 컨디션, 노선, 세대수</strong> 조건 중 일부가 완전히 일치하지 않을 수 있습니다.
+        </div>
+        """, unsafe_allow_html=True)
 
 
     # 추천 결과 출력 (텍스트 형식)
