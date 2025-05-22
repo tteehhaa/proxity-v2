@@ -187,10 +187,9 @@ def classify_recommendation(row, budget_upper, total_budget):
     if price <= total_budget:
         return "입력하신 예산 범위 내에 속하는 단지입니다."
     elif price <= budget_upper:
-        return f"예산을 약 {초과비율}% 초과하지만 다른 조건에 부합하거나 고려해볼만하여 추천 드립니다. (약 {초과금액}억 추가 필요)"
-
-
-
+        return f"예산을 약 {초과비율}% 초과하지만 다른 조건에 부합하거나 고려해볼만하여 추천드립니다. (약 {초과금액}억 추가 필요)"
+    else:
+        return f"예산 대비 {초과비율}% 초과로 추천 대상에서 제외되어야 하지만, 단지 특성상 예외적으로 참고용으로 제시됩니다. (약 {초과금액}억 초과)"
 
 # --- 데이터 처리 및 출력 ---
 if submitted:
@@ -396,10 +395,11 @@ if submitted:
         출처 = row['가격출처']
         조건설명, _ = get_condition_note(cash, loan, area_group, condition, lines, household, row)
         추천이유 = classify_recommendation(row, budget_upper, total_budget)
-        if 추천이유 and 추천이유 != "None":
-            추천메시지 = f"{조건설명} {추천이유}".strip()
-        else:
-            추천메시지 = 조건설명
+        추천메시지 = f"{조건설명} {추천이유}".strip()
+
+        # 추정가 기반인 경우 메시지 보완
+        if row['가격출처_실사용'] == '동일단지 유사평형 호가 추정':
+            추천메시지 += " ※ 이 가격은 과거 실거래 기준의 단순 추정이며, 실제 매물 가격은 달라질 수 있습니다."
 
         if row['가격출처_실사용'] == '동일단지 유사평형 호가 추정':
             추천메시지 += " ※ 이 가격은 과거 실거래 기준의 단순 추정이며, 실제 매물 가격은 달라질 수 있습니다."
