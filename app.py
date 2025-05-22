@@ -252,16 +252,12 @@ if submitted:
     # 동일 단지 유사 평형 호가 추정
     df[['현재호가', '가격출처', '호가전용면적']] = df.apply(lambda row: pd.Series(estimate_similar_asking_price(row, df)), axis=1)
 
-    # 실사용가격 설정
+    # 실사용가격 설정 제거 → 추천가격만 사용
     df['추천가격'] = df['현재호가']
     df.loc[df['추천가격'].isna(), '추천가격'] = df['추정가']
-    df['가격출처_실사용'] = df['가격출처'].fillna('실거래가')
-    mask_호가 = df['실사용가격'].isna() & df['현재호가'].notna()
-    df.loc[mask_호가, '실사용가격'] = df['현재호가']
-    df.loc[mask_호가, '가격출처_실사용'] = df['가격출처']
-    mask_추정 = df['실사용가격'].isna() & df['추정가'].notna()
-    df.loc[mask_추정, '실사용가격'] = df['추정가']
-    df.loc[mask_추정, '가격출처_실사용'] = '추정'
+    df['가격출처_실사용'] = df['가격출처'].fillna('실거래가')  # 또는 '없음'
+
+    
     # 실사용가격이 0이거나 NaN인 경우 제외
     df = df[df['추천가격'].notna() & (df['추천가격'] > 0)]
 
@@ -270,7 +266,7 @@ if submitted:
     
     # 예산 내 단지 필터링 (예산 ±10%)
     budget_lower = total_budget * 0.9
-    df_filtered = df[(df['실사용가격'] <= budget_upper) & (df['실사용가격'] >= budget_lower)].copy()
+    df_filtered = df[(df['추천가격'] <= budget_upper) & (df['추천가격'] >= budget_lower)].copy()
     
     # 평형 조건 필터링 (평형 기준)
     if area_group != "상관없음":
@@ -308,7 +304,7 @@ if submitted:
     # ✅ fallback 추천: 예산 초과 단지 중 평형 조건도 만족하는 단지 보완
     if len(top3) < 3:
         df_extended = df[
-            (df['실사용가격'] > budget_upper)
+            (df['추천가격'] > budget_upper)
         ]
     
         # 평형 필터 추가
@@ -321,7 +317,7 @@ if submitted:
         df_extended["상관_점수"] = df_extended.apply(lambda row: score_correlated_factors(row, area_group, condition, lines, household), axis=1)
         
         df_extended = df_extended.sort_values(
-            by=["실사용가격", "점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"],
+            by=["추천가격", "점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"],
             ascending=[True, False, False, False, False, False]
         )
     
@@ -336,12 +332,12 @@ if submitted:
     
     # fallback 추천: 예산 초과 단지 중 평형 조건도 만족하고 예산 초과 폭이 제한된 단지 보완
     if len(top3) < 3:
-        df_extended = df[df['실사용가격'] > budget_upper].copy()
+        df_extended = df[df['추천가격'] > budget_upper].copy()
     
         # 예산 초과 상한 제한 (예산의 1.5배 초과는 제외)
         fallback_price_limit = total_budget * 1.15  # 최대 15%까지만 허용
-        df_extended = df[(df['실사용가격'] > total_budget) & (df['실사용가격'] <= fallback_price_limit)]
-        df_extended = df_extended.sort_values(by=["실사용가격"], ascending=[True])
+        df_extended = df[(df['추천가격'] > total_budget) & (df['추천가격'] <= fallback_price_limit)]
+        df_extended = df_extended.sort_values(by=["추천가격"], ascending=[True])
         df_extended = df_extended.drop_duplicates(subset=['단지명'], keep='first')  # 저렴한 평형 우선
 
         # 평형 필터 추가
@@ -354,7 +350,7 @@ if submitted:
         df_extended["상관_점수"] = df_extended.apply(lambda row: score_correlated_factors(row, area_group, condition, lines, household), axis=1)
     
         df_extended = df_extended.sort_values(
-            by=["실사용가격", "점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"],
+            by=["추천가격", "점수", "상관_점수", "통합_점수", "역세권_우선", "노선_우선"],
             ascending=[True, False, False, False, False, False]
         )
     
